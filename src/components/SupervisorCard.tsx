@@ -11,6 +11,75 @@ interface SupervisorCardProps {
   onSelectSupervisor?: (supervisorName: string | null) => void;
 }
 
+/**
+ * Valida de forma estricta si un agente tiene nota numérica real cargada en el examen
+ * (descarta guiones '-', 'PENDIENTE', 'Ausente', cadenas vacías y valores no numéricos)
+ */
+export function isAgentEvaluated(agent: AgentRecord): boolean {
+  if (!agent) return false;
+  if (agent.status === "Pendiente" || (agent.status as string) === "Ausente") {
+    if (agent.score === null || agent.score === undefined || isNaN(agent.score)) {
+      return false;
+    }
+  }
+
+  const hasValidScore =
+    (typeof agent.score === "number" && !isNaN(agent.score) && agent.score !== null && agent.score >= 0) ||
+    (typeof agent.phoneScore === "number" && !isNaN(agent.phoneScore) && agent.phoneScore !== null && agent.phoneScore >= 0) ||
+    (typeof agent.digitalScore === "number" && !isNaN(agent.digitalScore) && agent.digitalScore !== null && agent.digitalScore >= 0) ||
+    (typeof agent.retakeScore === "number" && !isNaN(agent.retakeScore) && agent.retakeScore !== null && agent.retakeScore >= 0);
+
+  if (!hasValidScore) return false;
+  if (agent.status === "Pendiente") return false;
+
+  return true;
+}
+
+/**
+ * Genera dinámicamente las siglas o iniciales representativas de cada pestaña del Excel
+ */
+export function getDynamicTabAcronym(name: string | undefined | null, index: number): string {
+  if (!name) return `T${index + 1}`;
+  const trimmed = name.trim();
+
+  // 1. Código de proyecto explícito tipo CD2633, CD5562
+  const cdMatch = trimmed.match(/\b(CD[-_]?\d{3,6})\b/i);
+  if (cdMatch) {
+    return cdMatch[1].toUpperCase().replace(/[-_]/g, "");
+  }
+
+  // 2. Palabras clave de módulos de evaluación
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("fcr")) return "FCR";
+  if (lower.includes("tel") || lower.includes("voz")) return "TT";
+  if (lower.includes("dig") || lower.includes("chat")) return "TD";
+  if (lower.includes("recup")) return "REC";
+  if (lower.includes("calidad")) return "CAL";
+  if (lower.includes("onboard")) return "ONB";
+  if (lower.includes("genesys")) return "GEN";
+
+  // 3. Test 1, Test 2, etc.
+  const testNum = trimmed.match(/^Test\s*(\d+|[A-Za-z])/i);
+  if (testNum) {
+    return `T${testNum[1].toUpperCase()}`;
+  }
+
+  // 4. Siglas extraídas de las palabras principales
+  const cleanWords = trimmed
+    .split(/[\s\-_:/]+/)
+    .filter((w) => !/^\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}$/.test(w) && !/^\d{4}$/.test(w))
+    .filter((w) => !["de", "del", "la", "el", "en", "y", "a", "al", "los", "las", "para", "por"].includes(w.toLowerCase()));
+
+  if (cleanWords.length >= 2) {
+    const initials = cleanWords.slice(0, 3).map((w) => w[0]?.toUpperCase()).join("");
+    if (initials.length >= 2 && initials.length <= 4) {
+      return initials;
+    }
+  }
+
+  return `T${index + 1}`;
+}
+
 export const SupervisorCard: React.FC<SupervisorCardProps> = ({
   records,
   history = [],
@@ -39,7 +108,6 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
         pending: number;
         scoreSum: number;
         scoredCount: number;
-        testStats: Map<string, { total: number; approved: number; evaluated: number }>;
       }
     >();
 
@@ -57,13 +125,13 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
           pending: 0,
           scoreSum: 0,
           scoredCount: 0,
-          testStats: new Map(),
         });
       }
       const data = map.get(supName)!;
       data.agents.push(r);
       data.total++;
 
+      const isEvaluated = isAgentEvaluated(r);
       const isAppr = r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80);
       const isFail = r.status === "No Aprobado" || (typeof r.score === "number" && r.score < 80 && r.score >= 0);
 
@@ -71,59 +139,42 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
       else if (isFail) data.failed++;
       else data.pending++;
 
-      if (typeof r.score === "number" && !isNaN(r.score)) {
+      if (typeof r.score === "number" && !isNaN(r.score) && isEvaluated) {
         data.scoreSum += r.score;
         data.scoredCount++;
       }
     });
 
-    // If multiple tests are selected, calculate each individual test's approved/evaluated percentage for each Supervisor
-    if (activeEvaluations.length > 1) {
-      activeEvaluations.forEach((evalItem) => {
-        const evalRecords = evalItem.records || [];
-        evalRecords.forEach((r) => {
-          const rawSup = r.supervisor?.trim();
-          const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
-          const data = map.get(supName);
-          if (data) {
-            if (!data.testStats.has(evalItem.id)) {
-              data.testStats.set(evalItem.id, { total: 0, approved: 0, evaluated: 0 });
-            }
-            const tStat = data.testStats.get(evalItem.id)!;
-            tStat.total++;
-            const isAppr = r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80);
-            const isFail = r.status === "No Aprobado" || (typeof r.score === "number" && r.score < 80 && r.score >= 0);
-            if (isAppr) {
-              tStat.approved++;
-              tStat.evaluated++;
-            } else if (isFail) {
-              tStat.evaluated++;
-            }
-          }
-        });
-      });
-    }
-
     return Array.from(map.values())
       .map((data) => {
-        const evalTotal = data.approved + data.failed;
-        // Porcentaje de avance: asesores que rindieron sobre el total asignado
+        // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
+        const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
+        // Porcentaje de avance: asesores con nota real sobre el universo total de su equipo
         const porcentajeAvance =
-          data.total > 0 ? Math.round((evalTotal / data.total) * 100) : 0;
+          data.total > 0 ? Math.round((rendidosActuales / data.total) * 100) : 0;
 
-        // Formulate multi-test text: "T1: 85% | T2: 90%"
+        // Formulate multi-test badge dinámico: "TT: 85% | TD: 90%"
         let multiTestBadge = "";
         if (activeEvaluations.length > 1) {
           multiTestBadge = activeEvaluations
             .map((evalItem, index) => {
-              const tStat = data.testStats.get(evalItem.id);
-              let tRate = porcentajeAvance;
-              if (tStat && tStat.evaluated > 0) {
-                tRate = Math.round((tStat.approved / tStat.evaluated) * 100);
-              } else if (tStat && tStat.total > 0) {
-                tRate = Math.round((tStat.approved / tStat.total) * 100);
-              }
-              return `T${index + 1}: ${tRate}%`;
+              const acronym = getDynamicTabAcronym(evalItem.name || evalItem.sheetName, index);
+              const evalRecords = evalItem.records || [];
+
+              // Asesores que pertenecen a este supervisor en el examen puntual
+              const supervisorTestAgents = evalRecords.filter((r) => {
+                const rawSup = r.supervisor?.trim();
+                const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+                return supName.toLowerCase() === data.supervisor.toLowerCase();
+              });
+
+              // Asesores de su equipo que tienen nota numérica real en este test
+              const testRendidos = supervisorTestAgents.filter(isAgentEvaluated).length;
+              // Universo total de su equipo
+              const teamUniverse = data.total > 0 ? data.total : supervisorTestAgents.length;
+              const testRate = teamUniverse > 0 ? Math.round((testRendidos / teamUniverse) * 100) : 0;
+
+              return `${acronym}: ${testRate}%`;
             })
             .join(" | ");
         }

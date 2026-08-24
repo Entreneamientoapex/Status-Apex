@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Briefcase, ChevronRight, Check, Search, X, Users } from "lucide-react";
 import { AgentRecord } from "../types";
 import { SheetAnalysisRecord } from "../utils/googleSheetsService";
+import { isAgentEvaluated, getDynamicTabAcronym } from "./SupervisorCard";
 
 interface JCCCardProps {
   records: AgentRecord[];
@@ -39,7 +40,6 @@ export const JCCCard: React.FC<JCCCardProps> = ({
         pending: number;
         scoreSum: number;
         scoredCount: number;
-        testStats: Map<string, { total: number; approved: number; evaluated: number }>;
       }
     >();
 
@@ -57,13 +57,13 @@ export const JCCCard: React.FC<JCCCardProps> = ({
           pending: 0,
           scoreSum: 0,
           scoredCount: 0,
-          testStats: new Map(),
         });
       }
       const data = map.get(jccName)!;
       data.agents.push(r);
       data.total++;
 
+      const isEvaluated = isAgentEvaluated(r);
       const isAppr = r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80);
       const isFail = r.status === "No Aprobado" || (typeof r.score === "number" && r.score < 80 && r.score >= 0);
 
@@ -75,59 +75,42 @@ export const JCCCard: React.FC<JCCCardProps> = ({
         data.pending++;
       }
 
-      if (typeof r.score === "number" && !isNaN(r.score)) {
+      if (typeof r.score === "number" && !isNaN(r.score) && isEvaluated) {
         data.scoreSum += r.score;
         data.scoredCount++;
       }
     });
 
-    // If multiple tests are selected, calculate each individual test's approved/evaluated percentage for each JCC
-    if (activeEvaluations.length > 1) {
-      activeEvaluations.forEach((evalItem) => {
-        const evalRecords = evalItem.records || [];
-        evalRecords.forEach((r) => {
-          const rawJcc = r.jcc?.trim();
-          const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
-          const data = map.get(jccName);
-          if (data) {
-            if (!data.testStats.has(evalItem.id)) {
-              data.testStats.set(evalItem.id, { total: 0, approved: 0, evaluated: 0 });
-            }
-            const tStat = data.testStats.get(evalItem.id)!;
-            tStat.total++;
-            const isAppr = r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80);
-            const isFail = r.status === "No Aprobado" || (typeof r.score === "number" && r.score < 80 && r.score >= 0);
-            if (isAppr) {
-              tStat.approved++;
-              tStat.evaluated++;
-            } else if (isFail) {
-              tStat.evaluated++;
-            }
-          }
-        });
-      });
-    }
-
     return Array.from(map.values())
       .map((data) => {
-        const evalTotal = data.approved + data.failed;
-        // Porcentaje de avance: asesores que rindieron sobre el total asignado
+        // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
+        const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
+        // Porcentaje de avance: asesores con nota real sobre el total de su universo
         const porcentajeAvance =
-          data.total > 0 ? Math.round((evalTotal / data.total) * 100) : 0;
+          data.total > 0 ? Math.round((rendidosActuales / data.total) * 100) : 0;
 
-        // Formulate multi-test text: "T1: 85% | T2: 90%"
+        // Formulate multi-test badge dinámico: "TT: 85% | TD: 90%"
         let multiTestBadge = "";
         if (activeEvaluations.length > 1) {
           multiTestBadge = activeEvaluations
             .map((evalItem, index) => {
-              const tStat = data.testStats.get(evalItem.id);
-              let tRate = porcentajeAvance;
-              if (tStat && tStat.evaluated > 0) {
-                tRate = Math.round((tStat.approved / tStat.evaluated) * 100);
-              } else if (tStat && tStat.total > 0) {
-                tRate = Math.round((tStat.approved / tStat.total) * 100);
-              }
-              return `T${index + 1}: ${tRate}%`;
+              const acronym = getDynamicTabAcronym(evalItem.name || evalItem.sheetName, index);
+              const evalRecords = evalItem.records || [];
+
+              // Filtrar todos los asesores que dependen de este JCC en este examen específico
+              const jccTestAgents = evalRecords.filter((r) => {
+                const rawJcc = r.jcc?.trim();
+                const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
+                return jccName.toLowerCase() === data.jcc.toLowerCase();
+              });
+
+              // Asesores bajo este JCC que tienen nota real numérica en este test
+              const testRendidos = jccTestAgents.filter(isAgentEvaluated).length;
+              // Universo total bajo este JCC
+              const jccUniverse = data.total > 0 ? data.total : jccTestAgents.length;
+              const testRate = jccUniverse > 0 ? Math.round((testRendidos / jccUniverse) * 100) : 0;
+
+              return `${acronym}: ${testRate}%`;
             })
             .join(" | ");
         }
