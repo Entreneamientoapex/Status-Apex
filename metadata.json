@@ -1,0 +1,8 @@
+{
+  "name": "Remix Control de Agentes \u0026 Trainers",
+  "description": "Sistema de gestión y análisis inteligente de archivos de capacitación para control de agentes y aprobación de trainers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
