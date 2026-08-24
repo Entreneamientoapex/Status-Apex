@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Navbar } from "./components/Navbar";
 import { StatsCards } from "./components/StatsCards";
 import { AgentTable } from "./components/AgentTable";
@@ -50,6 +50,8 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
   const [togglingTestId, setTogglingTestId] = useState<string | null>(null);
+  const [selectedJCC, setSelectedJCC] = useState<string | null>(null);
+  const [selectedSupervisor, setSelectedSupervisor] = useState<string | null>(null);
 
   // Google Sheets Tabs & History State
   const [history, setHistory] = useState<SheetAnalysisRecord[]>([]);
@@ -225,6 +227,7 @@ export default function App() {
   const handleSelectAnalysis = (analysis: SheetAnalysisRecord) => {
     setActiveAnalysisId(analysis.id);
     setRecords(analysis.records);
+    setSelectedTestIds([]);
 
     setCurrentBatch({
       id: analysis.id,
@@ -242,6 +245,136 @@ export default function App() {
 
     showToast(`Pestaña "${analysis.name}" cargada en el dashboard.`, "success");
   };
+
+  // Derive records based on active test selection (single tab or multi-test checkboxes)
+  const currentTestRecords = useMemo(() => {
+    if (selectedTestIds.length === 0) {
+      return records;
+    }
+    const matchingTests = history.filter((h) => selectedTestIds.includes(h.id));
+    if (matchingTests.length === 0) {
+      return records;
+    }
+    if (matchingTests.length === 1) {
+      return matchingTests[0].records || [];
+    }
+
+    // Consolidate across multiple tests
+    const agentMap = new Map<
+      string,
+      {
+        base: AgentRecord;
+        scores: number[];
+        statuses: string[];
+        retakeScores: number[];
+      }
+    >();
+
+    matchingTests.forEach((analysis) => {
+      (analysis.records || []).forEach((r) => {
+        const key = (r.name || r.id || "").trim().toLowerCase();
+        if (!key) return;
+        if (!agentMap.has(key)) {
+          agentMap.set(key, {
+            base: { ...r },
+            scores: [],
+            statuses: [],
+            retakeScores: [],
+          });
+        }
+        const entry = agentMap.get(key)!;
+        if (
+          r.supervisor &&
+          (!entry.base.supervisor ||
+            entry.base.supervisor === "Sin Asignar" ||
+            entry.base.supervisor === "Sin Supervisor Asignado")
+        ) {
+          entry.base.supervisor = r.supervisor;
+        }
+        if (
+          r.jcc &&
+          (!entry.base.jcc ||
+            entry.base.jcc === "-" ||
+            entry.base.jcc === "Sin JCC Asignado")
+        ) {
+          entry.base.jcc = r.jcc;
+        }
+        if (typeof r.score === "number" && !isNaN(r.score)) {
+          entry.scores.push(r.score);
+        }
+        if (typeof r.retakeScore === "number" && !isNaN(r.retakeScore)) {
+          entry.retakeScores.push(r.retakeScore);
+        }
+        if (r.status) {
+          entry.statuses.push(r.status);
+        }
+      });
+    });
+
+    return Array.from(agentMap.values()).map(
+      ({ base, scores, statuses, retakeScores }) => {
+        let finalScore: number | undefined = undefined;
+        let finalStatus: ApprovalStatus = "Pendiente";
+
+        if (scores.length > 0) {
+          const avg = Math.round(
+            scores.reduce((a, b) => a + b, 0) / scores.length
+          );
+          finalScore = avg;
+          if (avg >= 80) {
+            finalStatus = "Aprobado";
+          } else {
+            finalStatus = "No Aprobado";
+          }
+        } else if (statuses.includes("Aprobado")) {
+          finalStatus = "Aprobado";
+          finalScore = 85;
+        } else if (statuses.includes("No Aprobado")) {
+          finalStatus = "No Aprobado";
+          finalScore = 50;
+        } else {
+          finalStatus = "Pendiente";
+        }
+
+        return {
+          ...base,
+          score: finalScore,
+          status: finalStatus,
+          retakeScore:
+            retakeScores.length > 0
+              ? Math.round(
+                  retakeScores.reduce((a, b) => a + b, 0) / retakeScores.length
+                )
+              : undefined,
+        };
+      }
+    );
+  }, [records, selectedTestIds, history]);
+
+  // Derive filtered records by selected JCC and selected supervisor
+  const displayRecords = useMemo(() => {
+    let result = currentTestRecords;
+
+    if (selectedJCC) {
+      const jccLower = selectedJCC.trim().toLowerCase();
+      result = result.filter((r) => {
+        const rawJcc = r.jcc?.trim();
+        const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
+        return jccName.toLowerCase() === jccLower;
+      });
+    }
+
+    if (selectedSupervisor) {
+      const supLower = selectedSupervisor.trim().toLowerCase();
+      result = result.filter((r) => {
+        const rawSup = r.supervisor?.trim();
+        const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+        return supName.toLowerCase() === supLower;
+      });
+    }
+
+    return result;
+  }, [currentTestRecords, selectedJCC, selectedSupervisor]);
 
   // Export to Excel
   const handleExportExcel = () => {
@@ -575,15 +708,21 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
 
         {/* Top KPIs & Metric Cards */}
         <StatsCards
-          records={records}
+          records={displayRecords}
           activeFilter={statusFilter}
           onFilterStatus={(status) => setStatusFilter(status)}
           onOpenStatusModal={(status) => setStatusDetailModal(status)}
+          selectedJCC={selectedJCC}
+          onClearJCC={() => setSelectedJCC(null)}
+          selectedSupervisor={selectedSupervisor}
+          onClearSupervisor={() => setSelectedSupervisor(null)}
+          selectedTestCount={selectedTestIds.length}
+          onClearTestFilter={() => setSelectedTestIds([])}
         />
 
         {/* Analytics Distribution Charts & Interactivo Historial de Pestañas de Google Sheet */}
         <AnalyticsCharts
-          records={records}
+          records={currentTestRecords}
           history={history}
           activeAnalysisId={activeAnalysisId}
           isLoadingHistory={isLoadingSheets}
@@ -595,11 +734,19 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
           onSelectAllTests={handleSelectAllTests}
           onToggleTestStatus={handleToggleTestStatus}
           togglingTestId={togglingTestId}
+          selectedJCC={selectedJCC}
+          onSelectJCC={(jcc) => {
+            setSelectedJCC(jcc);
+            // Si se cambia de JCC, limpiar filtro de supervisor previo para evitar inconsistencias
+            setSelectedSupervisor(null);
+          }}
+          selectedSupervisor={selectedSupervisor}
+          onSelectSupervisor={(sup) => setSelectedSupervisor(sup)}
         />
 
         {/* Main Agent Table & Management Area */}
         <AgentTable
-          records={records}
+          records={displayRecords}
           userRole={isAdmin ? "Editor" : "Lector"}
           externalStatusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
@@ -702,7 +849,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       {statusDetailModal && (
         <StatusDetailModal
           status={statusDetailModal}
-          records={records}
+          records={displayRecords}
           onClose={() => setStatusDetailModal(null)}
           onSelectAgent={(agent) => {
             setSelectedAgentForDetail(agent);

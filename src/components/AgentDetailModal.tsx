@@ -12,6 +12,7 @@ import {
   Check,
   UserCheck,
   FileSpreadsheet,
+  Briefcase,
 } from "lucide-react";
 import { AgentRecord, ApprovalStatus } from "../types";
 
@@ -188,10 +189,18 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
             <div className="bg-[#F9F9F7] p-4 rounded-xl border border-[#D9DED4] space-y-1">
               <span className="text-[11px] font-semibold text-[#6B7366] flex items-center gap-1.5">
                 <UserCheck className="h-4 w-4 text-[#8DA189]" />
-                <span>Supervisor / Líder</span>
+                <span>Supervisor & JCC</span>
               </span>
               <p className="font-semibold text-sm text-[#2D332A]">{agent.supervisor || "Sin supervisor asignado"}</p>
-              <p className="text-xs text-[#6B7366]">Campaña: {agent.campaign || "General"}</p>
+              <div className="text-xs text-[#6B7366] space-y-0.5 mt-1">
+                <p>Campaña: <span className="text-[#2D332A] font-medium">{agent.campaign || "General"}</span></p>
+                {agent.jcc && agent.jcc !== "-" && (
+                  <p className="flex items-center gap-1 text-[#2B579A] font-medium">
+                    <Briefcase className="h-3 w-3" />
+                    <span>JCC: {agent.jcc}</span>
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="bg-[#F9F9F7] p-4 rounded-xl border border-[#D9DED4] space-y-1">

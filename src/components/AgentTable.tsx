@@ -911,7 +911,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Supervisor & Campaign */}
+                      {/* Supervisor & Campaña / JCC */}
                       <td className="p-3.5 sm:p-4">
                         <div className="font-medium text-[#2D332A] flex items-center gap-1.5">
                           <UserCheck className="h-3.5 w-3.5 text-[#8DA189]" />
@@ -919,8 +919,16 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                             {agent.supervisor || "Sin asignar"}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#6B7366] mt-0.5 truncate max-w-[170px]">
-                          {agent.campaign || "General"}
+                        <div className="text-[11px] text-[#6B7366] mt-0.5 truncate max-w-[170px] flex items-center gap-1 flex-wrap">
+                          <span>{agent.campaign || "General"}</span>
+                          {agent.jcc && agent.jcc !== "-" && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[#2B579A] font-medium" title={`JCC: ${agent.jcc}`}>
+                                {agent.jcc}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </td>
 

@@ -41,15 +41,18 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
   const statusRecords = useMemo(() => {
     if (!status || status === "ALL") return records;
     if (status === "Aprobado") {
-      return records.filter((r) => r.status === "Aprobado");
+      return records.filter((r) => r.status === "Aprobado" || (typeof r.score === "number" && !isNaN(r.score) && r.score >= 80));
     }
     if (status === "No Aprobado") {
-      return records.filter((r) => r.status === "No Aprobado");
+      return records.filter((r) => r.status === "No Aprobado" || (typeof r.score === "number" && !isNaN(r.score) && r.score < 80 && r.score >= 0));
     }
     if (status === "Pendiente") {
-      return records.filter(
-        (r) => r.status === "Pendiente" || (r.status !== "Aprobado" && r.status !== "No Aprobado")
-      );
+      return records.filter((r) => {
+        const hasScore = typeof r.score === "number" && !isNaN(r.score);
+        if (r.status === "Pendiente") return true;
+        if (!hasScore && r.status !== "Aprobado" && r.status !== "No Aprobado") return true;
+        return false;
+      });
     }
     return records.filter((r) => r.status === status);
   }, [records, status]);

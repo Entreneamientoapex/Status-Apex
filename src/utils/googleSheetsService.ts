@@ -11,6 +11,7 @@ export interface MasterAgent {
   legajo: string;
   name: string;
   supervisor: string;
+  jcc?: string;
   campaign?: string;
   cleanLegajo: string;
   cleanName: string;
@@ -358,14 +359,21 @@ export async function fetchMasterAgentList(
     ["lider", "líder", "supervisor", "supervisora", "sup", "teamleader", "tl", "coordinador", "jefe"].some((k) => h === k || h.includes(k))
   );
 
+  const colJcc = headerRow.findIndex((h) =>
+    ["jcc", "jefe", "jefatura", "jefecentro", "gerente", "coordinadorgeneral"].some((k) => h === k || h.includes(k))
+  );
+
   let colCampaign = headerRow.findIndex((h) =>
     ["campana", "campaña", "proyecto", "proyectos", "cuenta", "servicio", "segmento", "area", "operacion", "departamento", "skill", "cd"].some((k) => h === k || h.includes(k))
   );
 
-  // Si colCampaign no se encontró por nombre pero la primera columna no es legajo/nombre/supervisor, usar columna 0
+  // Si colCampaign no se encontró por nombre pero la primera columna no es legajo/nombre/supervisor/jcc, usar columna 0
   if (colCampaign === -1 && colLegajo !== 0 && colNombre !== 0 && colSupervisor !== 0 && headerRow.length > 0) {
     colCampaign = 0;
   }
+
+  // Si colJcc no se encontró por nombre pero hay al menos 5 columnas (ej: Campaña, Legajo, Nombre, Líder, JCC)
+  const resolvedColJcc = colJcc !== -1 ? colJcc : (headerRow.length >= 5 && colSupervisor !== 4 ? 4 : -1);
 
   const masterAgents: MasterAgent[] = [];
 
@@ -376,17 +384,20 @@ export async function fetchMasterAgentList(
     const rawLegajo = colLegajo !== -1 ? row[colLegajo]?.trim() : "";
     const rawNombre = colNombre !== -1 ? row[colNombre]?.trim() : "";
     const rawSupervisor = colSupervisor !== -1 ? row[colSupervisor]?.trim() : "";
+    const rawJcc = resolvedColJcc !== -1 ? row[resolvedColJcc]?.trim() : "";
     const rawCampaign = colCampaign !== -1 ? row[colCampaign]?.trim() : "";
 
     const legajo = rawLegajo || `U${100000 + i}`;
     const name = rawNombre || `Asesor ${i + 1}`;
     const supervisor = rawSupervisor && rawSupervisor !== "-" ? rawSupervisor : "Sin Supervisor Asignado";
+    const jcc = rawJcc && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
     const campaign = rawCampaign && rawCampaign !== "-" ? rawCampaign : "Operaciones";
 
     masterAgents.push({
       legajo,
       name,
       supervisor,
+      jcc,
       campaign,
       cleanLegajo: cleanHeaderString(legajo),
       cleanName: cleanHeaderString(name),
@@ -681,6 +692,7 @@ export async function fetchAndJoinTestAnalysis(
       agentId: m.legajo,
       campaign: m.campaign || "Operaciones",
       supervisor: m.supervisor,
+      jcc: m.jcc,
       trainingName: tab.name.split("-")[0]?.trim() || "Capacitación Operativa",
       trainerName: "Trainer Responsable",
       completionDate: timeInfo.iso.split("T")[0],
@@ -1140,6 +1152,7 @@ export async function fetchAndJoinTestAnalysis(
       agentId: master.legajo,
       campaign: master.campaign || "Operaciones",
       supervisor: master.supervisor,
+      jcc: master.jcc,
       trainingName: detectedCourseName || tab.name.split("-")[0]?.trim() || "Capacitación Operativa",
       trainerName,
       completionDate,

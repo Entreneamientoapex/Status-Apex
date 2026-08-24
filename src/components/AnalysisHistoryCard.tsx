@@ -77,15 +77,15 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
           </div>
         </div>
 
-        {/* Subheader with Admin Multi-Select Controls */}
+        {/* Subheader with Multi-Select Controls */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
           <p className="text-[11px] text-[#6B7366] leading-tight flex-1">
-            {isAdmin
-              ? "Selecciona evaluaciones para el reporte o alterna su estado en la nube:"
-              : "Cada pestaña es una evaluación. Hacé clic para ver sus métricas:"}
+            {someSelected
+              ? `Consolidando ${selectedTestIds.length} de ${history.length} evaluaciones:`
+              : "Marca casilleros para consolidar tests o haz clic en uno:"}
           </p>
 
-          {isAdmin && history.length > 0 && onSelectAllTests && (
+          {history.length > 0 && onSelectAllTests && (
             <button
               type="button"
               onClick={(e) => {
@@ -103,7 +103,7 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
               ) : (
                 <>
                   <CheckSquare className="h-3 w-3 text-[#4F7A4F]" />
-                  <span>Todos ({selectedTestIds.length})</span>
+                  <span>Todos ({selectedTestIds.length > 0 ? selectedTestIds.length : history.length})</span>
                 </>
               )}
             </button>
@@ -131,15 +131,15 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                 }`}
               >
                 <div className="flex items-start justify-between gap-2.5">
-                  {/* Admin Checkbox Selector */}
-                  {isAdmin && onToggleSelectTest && (
+                  {/* Checkbox Selector for multi-test consolidated metrics */}
+                  {onToggleSelectTest && (
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleSelectTest(item.id, e);
                       }}
                       className="pt-0.5 shrink-0 cursor-pointer"
-                      title={isChecked ? "Deseleccionar de reporte de correo" : "Marcar para reporte de correo"}
+                      title={isChecked ? "Deseleccionar evaluación de métricas" : "Marcar para consolidar en métricas"}
                     >
                       <input
                         type="checkbox"

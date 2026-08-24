@@ -6,6 +6,7 @@ export interface AgentRecord {
   agentId?: string; // DNI, legajo, email o código de empleado
   campaign?: string; // Campaña o departamento
   supervisor?: string; // Nombre del supervisor o Team Leader a cargo
+  jcc?: string; // Nombre del JCC / Jefe de Centro de Contactos a cargo
   trainingName: string; // Nombre del curso o trainer
   trainerName: string; // Nombre del capacitador/trainer
   completionDate: string; // YYYY-MM-DD
