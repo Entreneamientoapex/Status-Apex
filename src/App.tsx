@@ -14,7 +14,7 @@ import { GuestMatriculacionModal } from "./components/GuestMatriculacionModal";
 import { GuestFeedbackModal } from "./components/GuestFeedbackModal";
 import { INITIAL_DEMO_RECORDS, INITIAL_BATCH } from "./utils/demoData";
 import { exportAgentsToExcel } from "./utils/excelParser";
-import { AgentRecord, ApprovalStatus, TrainingBatch } from "./types";
+import { AgentRecord, AgentTestDetail, ApprovalStatus, TrainingBatch } from "./types";
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -255,24 +255,42 @@ export default function App() {
     if (matchingTests.length === 0) {
       return records;
     }
+
     if (matchingTests.length === 1) {
-      return matchingTests[0].records || [];
+      const single = matchingTests[0];
+      const singleName = single.name || single.trainingTopic || single.sheetName || "Evaluación";
+      return (single.records || []).map((r) => ({
+        ...r,
+        testBreakdown: [
+          {
+            testId: single.id,
+            testName: singleName,
+            trainingTopic: r.trainingName || single.trainingTopic,
+            trainerName: r.trainerName || single.trainer,
+            score: r.score,
+            minPassingScore: r.minPassingScore || 80,
+            status: r.status,
+            passedInRetake: r.passedInRetake,
+            retakeScore: r.retakeScore,
+          },
+        ],
+      }));
     }
 
-    // Consolidate across multiple tests
+    // Consolidate across multiple tests (2 or more active evaluations)
     const agentMap = new Map<
       string,
       {
         base: AgentRecord;
         scores: number[];
-        statuses: string[];
+        statuses: ApprovalStatus[];
         retakeScores: number[];
       }
     >();
 
     matchingTests.forEach((analysis) => {
       (analysis.records || []).forEach((r) => {
-        const key = (r.name || r.id || "").trim().toLowerCase();
+        const key = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim()).toLowerCase();
         if (!key) return;
         if (!agentMap.has(key)) {
           agentMap.set(key, {
@@ -311,44 +329,91 @@ export default function App() {
       });
     });
 
-    return Array.from(agentMap.values()).map(
-      ({ base, scores, statuses, retakeScores }) => {
-        let finalScore: number | undefined = undefined;
-        let finalStatus: ApprovalStatus = "Pendiente";
+    return Array.from(agentMap.entries()).map(([key, { base, scores, statuses, retakeScores }]) => {
+      // Build individual breakdown for every selected test
+      const testBreakdown: AgentTestDetail[] = matchingTests.map((testItem) => {
+        const testName = testItem.name || testItem.trainingTopic || testItem.sheetName || "Test";
+        const found = (testItem.records || []).find((rec) => {
+          const recKey = (rec.agentId?.trim() || rec.agentName?.trim() || rec.id?.trim()).toLowerCase();
+          return recKey === key || (rec.agentName && rec.agentName.trim().toLowerCase() === base.agentName.trim().toLowerCase());
+        });
 
-        if (scores.length > 0) {
-          const avg = Math.round(
-            scores.reduce((a, b) => a + b, 0) / scores.length
-          );
-          finalScore = avg;
-          if (avg >= 80) {
-            finalStatus = "Aprobado";
-          } else {
-            finalStatus = "No Aprobado";
-          }
-        } else if (statuses.includes("Aprobado")) {
-          finalStatus = "Aprobado";
-          finalScore = 85;
-        } else if (statuses.includes("No Aprobado")) {
-          finalStatus = "No Aprobado";
-          finalScore = 50;
+        if (found && typeof found.score === "number" && !isNaN(found.score)) {
+          const isAppr = found.score >= (found.minPassingScore || 80) || found.status === "Aprobado";
+          return {
+            testId: testItem.id,
+            testName,
+            trainingTopic: found.trainingName || testItem.trainingTopic,
+            trainerName: found.trainerName || testItem.trainer,
+            score: found.score,
+            minPassingScore: found.minPassingScore || 80,
+            status: (isAppr ? "Aprobado" : "No Aprobado") as ApprovalStatus,
+            passedInRetake: found.passedInRetake,
+            retakeScore: found.retakeScore,
+          };
+        } else if (found && found.status && found.status !== "Pendiente") {
+          return {
+            testId: testItem.id,
+            testName,
+            trainingTopic: found.trainingName || testItem.trainingTopic,
+            trainerName: found.trainerName || testItem.trainer,
+            score: found.status === "Aprobado" ? 85 : 50,
+            minPassingScore: found.minPassingScore || 80,
+            status: found.status,
+            passedInRetake: found.passedInRetake,
+            retakeScore: found.retakeScore,
+          };
         } else {
-          finalStatus = "Pendiente";
+          return {
+            testId: testItem.id,
+            testName,
+            trainingTopic: testItem.trainingTopic,
+            trainerName: testItem.trainer,
+            score: null,
+            minPassingScore: 80,
+            status: "Pendiente" as ApprovalStatus,
+          };
         }
+      });
 
-        return {
-          ...base,
-          score: finalScore,
-          status: finalStatus,
-          retakeScore:
-            retakeScores.length > 0
-              ? Math.round(
-                  retakeScores.reduce((a, b) => a + b, 0) / retakeScores.length
-                )
-              : undefined,
-        };
+      let finalScore: number | null = null;
+      let finalStatus: ApprovalStatus = "Pendiente";
+
+      if (scores.length > 0) {
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        finalScore = avg;
+        if (avg >= 80) {
+          finalStatus = "Aprobado";
+        } else {
+          finalStatus = "No Aprobado";
+        }
+      } else if (statuses.includes("Aprobado")) {
+        finalStatus = "Aprobado";
+        finalScore = 85;
+      } else if (statuses.includes("No Aprobado")) {
+        finalStatus = "No Aprobado";
+        finalScore = 50;
+      } else {
+        finalStatus = "Pendiente";
       }
-    );
+
+      // Multi-test training names concatenated
+      const trainingNameList = matchingTests
+        .map((t) => t.name || t.trainingTopic || t.sheetName)
+        .join(", ");
+
+      return {
+        ...base,
+        trainingName: trainingNameList || base.trainingName,
+        score: finalScore,
+        status: finalStatus,
+        retakeScore:
+          retakeScores.length > 0
+            ? Math.round(retakeScores.reduce((a, b) => a + b, 0) / retakeScores.length)
+            : undefined,
+        testBreakdown,
+      };
+    });
   }, [records, selectedTestIds, history]);
 
   // Derive filtered records by selected JCC and selected supervisor
@@ -747,6 +812,13 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
         {/* Main Agent Table & Management Area */}
         <AgentTable
           records={displayRecords}
+          history={history}
+          selectedTestIds={selectedTestIds}
+          activeAnalysisId={activeAnalysisId}
+          selectedSupervisor={selectedSupervisor}
+          selectedJCC={selectedJCC}
+          onClearSupervisor={() => setSelectedSupervisor(null)}
+          onClearJCC={() => setSelectedJCC(null)}
           userRole={isAdmin ? "Editor" : "Lector"}
           externalStatusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}

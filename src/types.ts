@@ -1,5 +1,17 @@
 export type ApprovalStatus = 'Aprobado' | 'No Aprobado' | 'En Curso' | 'Pendiente' | 'Condicional';
 
+export interface AgentTestDetail {
+  testId: string;
+  testName: string; // e.g. "CD2633", "CD2552"
+  trainingTopic?: string;
+  trainerName?: string;
+  score: number | null;
+  minPassingScore: number;
+  status: ApprovalStatus;
+  passedInRetake?: boolean;
+  retakeScore?: number | null;
+}
+
 export interface AgentRecord {
   id: string;
   agentName: string;
@@ -25,6 +37,7 @@ export interface AgentRecord {
   retakeDetails?: string; // Detalle del recuperatorio (ej. 'Recuperatorio Columna V: 85 pts')
   batchId?: string;
   sourceFileName?: string;
+  testBreakdown?: AgentTestDetail[]; // Desglose individual cuando hay 1 o más tests seleccionados
 }
 
 export interface TrainingBatch {
