@@ -177,8 +177,11 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       }
       showToast("¡Plantilla copiada al portapapeles! Redirigiendo a Gmail...");
 
-      const subjectEncoded = encodeURIComponent("Solicitud de Matriculación - [Nombre del Proyecto / Campaña]");
-      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subjectEncoded}`;
+      const toRecipients = "EstrategiadelEntrenamiento@teco.com.ar,EntrenamientoPresencial@personal.com.ar";
+      const ccRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,matiasgabriel.diaz@apexamerica.com,jose.perini@apexamerica.com,JGUILBOURG@personal.com.ar,GaASoto@personal.com.ar,vanesacarolina.alegre@apexamerica.com";
+      const courseName = matData.nombreCursoTest?.trim() || "[Nombre del Curso / Test]";
+      const subjectEncoded = encodeURIComponent(`Solicitud de Matriculación - ${courseName}`);
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(toRecipients)}&cc=${encodeURIComponent(ccRecipients)}&su=${subjectEncoded}`;
       window.open(gmailUrl, "_blank");
     } catch (e) {
       console.error(e);

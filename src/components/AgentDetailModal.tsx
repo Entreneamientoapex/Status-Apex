@@ -191,7 +191,15 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
                 <UserCheck className="h-4 w-4 text-[#8DA189]" />
                 <span>Supervisor & JCC</span>
               </span>
-              <p className="font-semibold text-sm text-[#2D332A]">{agent.supervisor || "Sin supervisor asignado"}</p>
+              <p className="font-semibold text-sm text-[#2D332A]">
+                {agent.supervisor &&
+                agent.supervisor !== "-" &&
+                agent.supervisor.toLowerCase() !== "sin supervisor asignado" &&
+                agent.supervisor.toLowerCase() !== "sin supervisor" &&
+                agent.supervisor.toLowerCase() !== "sin asignar"
+                  ? agent.supervisor
+                  : "Staff"}
+              </p>
               <div className="text-xs text-[#6B7366] space-y-0.5 mt-1">
                 <p>Campaña: <span className="text-[#2D332A] font-medium">{agent.campaign || "General"}</span></p>
                 {agent.jcc && agent.jcc !== "-" && (

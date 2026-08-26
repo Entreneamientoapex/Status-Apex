@@ -294,7 +294,7 @@ export async function fetchMasterAgentList(
     return INITIAL_DEMO_RECORDS.map((r) => ({
       legajo: r.agentId || `U${r.id}`,
       name: r.agentName,
-      supervisor: r.supervisor || "Supervisor Responsable",
+      supervisor: r.supervisor && r.supervisor !== "Sin Supervisor Asignado" && r.supervisor !== "-" ? r.supervisor : "Staff",
       campaign: r.campaign || "Operaciones",
       cleanLegajo: cleanHeaderString(r.agentId || `U${r.id}`),
       cleanName: cleanHeaderString(r.agentName),
@@ -336,7 +336,7 @@ export async function fetchMasterAgentList(
     return INITIAL_DEMO_RECORDS.map((r) => ({
       legajo: r.agentId || `U${r.id}`,
       name: r.agentName,
-      supervisor: r.supervisor || "Supervisor Responsable",
+      supervisor: r.supervisor && r.supervisor !== "Sin Supervisor Asignado" && r.supervisor !== "-" ? r.supervisor : "Staff",
       campaign: r.campaign || "Operaciones",
       cleanLegajo: cleanHeaderString(r.agentId || `U${r.id}`),
       cleanName: cleanHeaderString(r.agentName),
@@ -389,7 +389,18 @@ export async function fetchMasterAgentList(
 
     const legajo = rawLegajo || `U${100000 + i}`;
     const name = rawNombre || `Asesor ${i + 1}`;
-    const supervisor = rawSupervisor && rawSupervisor !== "-" ? rawSupervisor : "Sin Supervisor Asignado";
+    
+    // Normalización estricta: Si la celda está vacía, contiene solo espacios o es "Sin Supervisor Asignado", forzar a "Staff"
+    const cleanSup = rawSupervisor ? rawSupervisor.trim() : "";
+    const supervisor =
+      !cleanSup ||
+      cleanSup === "-" ||
+      cleanSup.toLowerCase() === "sin supervisor asignado" ||
+      cleanSup.toLowerCase() === "sin supervisor" ||
+      cleanSup.toLowerCase() === "sin asignar"
+        ? "Staff"
+        : cleanSup;
+
     const jcc = rawJcc && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
     const campaign = rawCampaign && rawCampaign !== "-" ? rawCampaign : "Operaciones";
 

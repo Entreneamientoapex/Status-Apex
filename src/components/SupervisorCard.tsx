@@ -113,7 +113,14 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
 
     records.forEach((r) => {
       const rawSup = r.supervisor?.trim();
-      const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+      const supName =
+        !rawSup ||
+        rawSup === "-" ||
+        rawSup.toLowerCase() === "sin supervisor asignado" ||
+        rawSup.toLowerCase() === "sin supervisor" ||
+        rawSup.toLowerCase() === "sin asignar"
+          ? "Staff"
+          : rawSup;
 
       if (!map.has(supName)) {
         map.set(supName, {
@@ -164,7 +171,14 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
               // Asesores que pertenecen a este supervisor en el examen puntual
               const supervisorTestAgents = evalRecords.filter((r) => {
                 const rawSup = r.supervisor?.trim();
-                const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+                const supName =
+                  !rawSup ||
+                  rawSup === "-" ||
+                  rawSup.toLowerCase() === "sin supervisor asignado" ||
+                  rawSup.toLowerCase() === "sin supervisor" ||
+                  rawSup.toLowerCase() === "sin asignar"
+                    ? "Staff"
+                    : rawSup;
                 return supName.toLowerCase() === data.supervisor.toLowerCase();
               });
 

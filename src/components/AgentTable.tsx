@@ -270,7 +270,14 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         if (selectedSupervisor) {
           const supLower = selectedSupervisor.trim().toLowerCase();
           const rawSup = r.supervisor?.trim();
-          const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+          const supName =
+            !rawSup ||
+            rawSup === "-" ||
+            rawSup.toLowerCase() === "sin supervisor asignado" ||
+            rawSup.toLowerCase() === "sin supervisor" ||
+            rawSup.toLowerCase() === "sin asignar"
+              ? "Staff"
+              : rawSup;
           if (supName.toLowerCase() !== supLower) return false;
         }
 
@@ -409,7 +416,15 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
     testSubTablesData.forEach((sub) => {
       sub.agents.forEach((r) => {
-        const supKey = r.supervisor?.trim() || "Sin Supervisor Asignado";
+        const rawSup = r.supervisor?.trim();
+        const supKey =
+          !rawSup ||
+          rawSup === "-" ||
+          rawSup.toLowerCase() === "sin supervisor asignado" ||
+          rawSup.toLowerCase() === "sin supervisor" ||
+          rawSup.toLowerCase() === "sin asignar"
+            ? "Staff"
+            : rawSup;
         if (!map.has(supKey)) {
           map.set(supKey, []);
         }
@@ -433,7 +448,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         .filter((s): s is number => typeof s === "number");
       const avgScore =
         scores.length > 0
-          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
           : null;
 
       groups.push({
@@ -450,8 +465,8 @@ export const AgentTable: React.FC<AgentTableProps> = ({
     });
 
     return groups.sort((a, b) => {
-      if (a.name === "Sin Supervisor Asignado") return 1;
-      if (b.name === "Sin Supervisor Asignado") return -1;
+      if (a.name === "Staff") return 1;
+      if (b.name === "Staff") return -1;
       return a.name.localeCompare(b.name);
     });
   }, [testSubTablesData]);
@@ -1077,8 +1092,28 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                               <td className="p-3.5 sm:p-4">
                                 <div className="font-medium text-[#2D332A] flex items-center gap-1.5">
                                   <UserCheck className="h-3.5 w-3.5 text-[#8DA189]" />
-                                  <span className="truncate max-w-[170px]" title={agent.supervisor || "Sin Supervisor"}>
-                                    {agent.supervisor || "Sin asignar"}
+                                  <span
+                                    className="truncate max-w-[170px]"
+                                    title={
+                                      agent.supervisor &&
+                                      agent.supervisor !== "-" &&
+                                      agent.supervisor.toLowerCase() !== "sin supervisor asignado" &&
+                                      agent.supervisor.toLowerCase() !== "sin supervisor" &&
+                                      agent.supervisor.toLowerCase() !== "sin asignar"
+                                        ? `Líder: ${agent.supervisor}`
+                                        : "Líder: Staff"
+                                    }
+                                  >
+                                    Líder:{" "}
+                                    <strong className="font-bold text-[#2D332A]">
+                                      {agent.supervisor &&
+                                      agent.supervisor !== "-" &&
+                                      agent.supervisor.toLowerCase() !== "sin supervisor asignado" &&
+                                      agent.supervisor.toLowerCase() !== "sin supervisor" &&
+                                      agent.supervisor.toLowerCase() !== "sin asignar"
+                                        ? agent.supervisor
+                                        : "Staff"}
+                                    </strong>
                                   </span>
                                 </div>
                                 <div className="text-[11px] text-[#6B7366] mt-0.5 truncate max-w-[170px] flex items-center gap-1 flex-wrap">

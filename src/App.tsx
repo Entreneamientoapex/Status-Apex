@@ -488,39 +488,24 @@ export default function App() {
         }
       }
 
-      // Construcción de bloques verticales para cada evaluación seleccionada
-      const testBlocks = targetTests.map((test) => {
-        const total = test.totalAgents || (test.records ? test.records.length : 0);
+      // Construcción de bloques verticales para cada evaluación seleccionada mediante bucle
+      let dynamicBlocks = "";
+      targetTests.forEach((test) => {
+        const totalAgentes = test.totalAgents || (test.records ? test.records.length : 0);
         const aprobados = test.approvedCount ?? (test.records ? test.records.filter((r) => r.status === "Aprobado").length : 0);
         const desaprobados = test.failedCount ?? (test.records ? test.records.filter((r) => r.status === "No Aprobado").length : 0);
-        const pendientes = test.pendingCount ?? (test.records ? test.records.filter((r) => r.status === "Pendiente").length : Math.max(0, total - aprobados - desaprobados));
+        const pendientes = test.pendingCount ?? (test.records ? test.records.filter((r) => r.status === "Pendiente").length : Math.max(0, totalAgentes - aprobados - desaprobados));
 
-        const porcentajeExito = total > 0 ? Math.round((aprobados / total) * 100) : 0;
-        const porcentajeDesaprobados = total > 0 ? Math.round((desaprobados / total) * 100) : 0;
-        const porcentajePendientes = total > 0 ? Math.round((pendientes / total) * 100) : 0;
+        const porcentajeAprobados = totalAgentes > 0 ? Math.round((aprobados / totalAgentes) * 100) : 0;
+        const porcentajeDesaprobados = totalAgentes > 0 ? Math.round((desaprobados / totalAgentes) * 100) : 0;
+        const porcentajePendientes = totalAgentes > 0 ? Math.round((pendientes / totalAgentes) * 100) : 0;
+        const nombreTest = test.name;
 
-        return `📊 Cuestionario: ${test.name}
-✅ Aprobados: ${aprobados} (${porcentajeExito}%)
-❌ Desaprobados: ${desaprobados} (${porcentajeDesaprobados}%)
-⏳ Pendientes por Realizar: ${pendientes} (${porcentajePendientes}%)
-👥 Universo Total Agentes: ${total}`;
+        dynamicBlocks += `\n📊 Cuestionario: ${nombreTest}\n✅ Aprobados: ${aprobados} (${porcentajeAprobados}%)\n❌ Desaprobados: ${desaprobados} (${porcentajeDesaprobados}%)\n⏳ Pendientes por Realizar: ${pendientes} (${porcentajePendientes}%)\n👥 Universo Total Agentes: ${totalAgentes}\n`;
       });
 
-      // Redacción del mensaje consolidado vertical estructurado en texto plano
-      const cuerpoTexto = 
-`Status Apex Soporte - Reporte Consolidado de Avance
-===================================================
-
-Buen día equipo,
-
-A continuación, se comparte el estado de las evaluaciones seleccionadas:
-
----------------------------------------------------
-${testBlocks.join("\n\n")}
----------------------------------------------------
-Link: 
-
-Nota: Este es un correo informativo interno de control de métricas.`;
+      // Redacción del mensaje con la estructura institucional exacta
+      const cuerpoTexto = `Status Apex Soporte - Reporte Consolidado de Avance\n===================================================\n\nEquipo, buen día!\n\nLes compartimos el actualizado de los cursos en mención:\n\n---------------------------------------------------${dynamicBlocks}---------------------------------------------------\nLink: https://status-apex-rose.vercel.app/\n\nEste es un correo informativo, no requiere respuesta.\n\nA disposición.\n\nSaludos cordiales.`;
 
       // Copiar automáticamente el cuerpo al portapapeles para no borrar la firma corporativa con imágenes en Gmail
       try {
@@ -531,13 +516,12 @@ Nota: Este es un correo informativo interno de control de métricas.`;
         console.warn("No se pudo copiar automáticamente al portapapeles:", clipErr);
       }
 
-      // Asunto descriptivo para 1 o múltiples evaluaciones
-      const asunto =
-        targetTests.length === 1
-          ? `📢 STATUS REALIZADO: ${targetTests[0].name}`
-          : `📢 STATUS CONSOLIDADO (${targetTests.length} Evaluaciones): ${targetTests.map((t) => t.name).join(", ")}`;
+      // Destinatarios y Asunto institucional preconfigurado para Gmail
+      const toRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,ar_soporte_supervisores@apexamerica.com";
+      const ccRecipients = "matiasgabriel.diaz@apexamerica.com,teco_calidad_soporte@apexamerica.com,sixto.tanaka@apexamerica.com,lautaro.aliaga@apexamerica.com,jose.perini@apexamerica.com,RIPENALOZA@personal.com.ar,vanesacarolina.alegre@apexamerica.com";
+      const asunto = "📢 STATUS REALIZADO: Reporte Consolidado de Avance";
 
-      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=${encodeURIComponent(asunto)}`;
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(toRecipients)}&cc=${encodeURIComponent(ccRecipients)}&su=${encodeURIComponent(asunto)}`;
 
       window.open(gmailUrl, "_blank");
       showToast(
@@ -568,8 +552,10 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       console.warn("No se pudo copiar automáticamente al portapapeles:", clipErr);
     }
 
-    const asuntoCodificado = encodeURIComponent("Solicitud de Matriculación - [Nombre del Proyecto / Campaña]");
-    const gmailMatriculacionUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=${asuntoCodificado}`;
+    const toRecipients = "EstrategiadelEntrenamiento@teco.com.ar,EntrenamientoPresencial@personal.com.ar";
+    const ccRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,matiasgabriel.diaz@apexamerica.com,jose.perini@apexamerica.com,JGUILBOURG@personal.com.ar,GaASoto@personal.com.ar,vanesacarolina.alegre@apexamerica.com";
+    const asuntoCodificado = encodeURIComponent("Solicitud de Matriculación - [Nombre del Curso / Test]");
+    const gmailMatriculacionUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(toRecipients)}&cc=${encodeURIComponent(ccRecipients)}&su=${asuntoCodificado}`;
     window.open(gmailMatriculacionUrl, "_blank");
 
     showToast(
