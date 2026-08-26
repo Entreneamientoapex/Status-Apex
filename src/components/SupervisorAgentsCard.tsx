@@ -13,21 +13,27 @@ export const SupervisorAgentsCard: React.FC<SupervisorAgentsCardProps> = ({
   selectedSupervisor,
   onClearSupervisor,
 }) => {
-  // Filtrar únicamente los asesores del supervisor seleccionado
+  // Filtrar únicamente los asesores del supervisor seleccionado (ordenados A-Z)
   const filteredAgents = useMemo(() => {
     if (!selectedSupervisor) return [];
-    return records.filter((r) => {
-      const rawSup = r.supervisor?.trim();
-      const sup =
-        !rawSup ||
-        rawSup === "-" ||
-        rawSup.toLowerCase() === "sin supervisor asignado" ||
-        rawSup.toLowerCase() === "sin supervisor" ||
-        rawSup.toLowerCase() === "sin asignar"
-          ? "Staff"
-          : rawSup;
-      return sup === selectedSupervisor;
-    });
+    return records
+      .filter((r) => {
+        const rawSup = r.supervisor?.trim();
+        const sup =
+          !rawSup ||
+          rawSup === "-" ||
+          rawSup.toLowerCase() === "sin supervisor asignado" ||
+          rawSup.toLowerCase() === "sin supervisor" ||
+          rawSup.toLowerCase() === "sin asignar"
+            ? "Staff"
+            : rawSup;
+        return sup === selectedSupervisor;
+      })
+      .sort((a, b) =>
+        (a.agentName || "").localeCompare(b.agentName || "", "es", {
+          sensitivity: "base",
+        })
+      );
   }, [records, selectedSupervisor]);
 
   // Estadísticas rápidas del supervisor seleccionado

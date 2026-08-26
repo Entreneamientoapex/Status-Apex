@@ -128,7 +128,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
             data.scoredCount > 0 ? Math.round(data.scoreSum / data.scoredCount) : 0,
         };
       })
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => a.jcc.localeCompare(b.jcc, "es", { sensitivity: "base" }));
   }, [records, activeEvaluations]);
 
   // Filter JCCs in real-time by search query

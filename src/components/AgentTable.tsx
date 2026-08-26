@@ -92,8 +92,8 @@ export const AgentTable: React.FC<AgentTableProps> = ({
     trainingName: "ALL",
     trainerName: "ALL",
     campaign: "ALL",
-    sortBy: "completionDate",
-    sortOrder: "desc",
+    sortBy: "agentName",
+    sortOrder: "asc",
     onlyNeedsRetraining: false,
   });
 
@@ -169,7 +169,14 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         if (selectedSupervisor) {
           const supLower = selectedSupervisor.trim().toLowerCase();
           const rawSup = r.supervisor?.trim();
-          const supName = rawSup && rawSup.length > 0 ? rawSup : "Sin Supervisor Asignado";
+          const supName =
+            !rawSup ||
+            rawSup === "-" ||
+            rawSup.toLowerCase() === "sin supervisor asignado" ||
+            rawSup.toLowerCase() === "sin supervisor" ||
+            rawSup.toLowerCase() === "sin asignar"
+              ? "Staff"
+              : rawSup;
           if (supName.toLowerCase() !== supLower) return false;
         }
 
@@ -246,6 +253,11 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         return true;
       })
       .sort((a, b) => {
+        if (filters.sortBy === "agentName") {
+          const res = (a.agentName || "").localeCompare(b.agentName || "", "es", { sensitivity: "base" });
+          return filters.sortOrder === "asc" ? res : -res;
+        }
+
         let valA: any = a[filters.sortBy];
         let valB: any = b[filters.sortBy];
 
@@ -254,9 +266,13 @@ export const AgentTable: React.FC<AgentTableProps> = ({
           valB = b.score ?? -1;
         }
 
-        if (valA < valB) return filters.sortOrder === "asc" ? -1 : 1;
-        if (valA > valB) return filters.sortOrder === "asc" ? 1 : -1;
-        return 0;
+        if (valA !== undefined && valB !== undefined && valA !== valB) {
+          if (valA < valB) return filters.sortOrder === "asc" ? -1 : 1;
+          if (valA > valB) return filters.sortOrder === "asc" ? 1 : -1;
+        }
+
+        // Ordenamiento alfabético estricto de respaldo por nombre/apellido del asesor (A-Z)
+        return (a.agentName || "").localeCompare(b.agentName || "", "es", { sensitivity: "base" });
       });
   };
 
@@ -435,6 +451,10 @@ export const AgentTable: React.FC<AgentTableProps> = ({
     const groups: SupervisorGroup[] = [];
 
     map.forEach((agentsList, supName) => {
+      // Ordenar asesores del supervisor alfabéticamente A-Z
+      agentsList.sort((a, b) =>
+        (a.agentName || "").localeCompare(b.agentName || "", "es", { sensitivity: "base" })
+      );
       const total = agentsList.length;
       const approved = agentsList.filter((a) => a.status === "Aprobado").length;
       const failed = agentsList.filter((a) => a.status === "No Aprobado").length;
@@ -1122,7 +1142,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     <>
                                       <span>•</span>
                                       <span className="text-[#2B579A] font-medium" title={`JCC: ${agent.jcc}`}>
-                                        {agent.jcc}
+                                        JCC: {agent.jcc}
                                       </span>
                                     </>
                                   )}
