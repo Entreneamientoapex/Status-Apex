@@ -48,6 +48,131 @@ export interface SheetConnectionStatus {
   tabCount: number;
 }
 
+export const DASHBOARD_CACHE_KEY = "apex_dashboard_cache";
+
+export interface ApexDashboardCacheData {
+  versionSig: string;
+  timestamp: number;
+  sheetUrl: string;
+  analyses: SheetAnalysisRecord[];
+}
+
+/**
+ * Consulta ultra-liviana a Google Sheets para obtener la firma hash / versión de modificación
+ * del documento sin descargar las pestañas pesadas ni el universo de datos.
+ */
+export async function fetchSheetLastModifiedSignature(
+  spreadsheetUrl: string = GOOGLE_SHEET_URL
+): Promise<string | null> {
+  const sheetId = extractSpreadsheetId(spreadsheetUrl);
+  if (!sheetId) return null;
+
+  try {
+    // 1. Consulta ultra-liviana a Google Visualization API solicitando solo 1 celda (A1)
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${encodeURIComponent("select A limit 1")}&headers=0`;
+    const res = await fetch(gvizUrl, { cache: "no-store" });
+    if (res.ok) {
+      const text = await res.text();
+      // Google GViz response contiene "sig":"<HASH_SIGNATURE>" o "version":"..." representando el estado de modificación
+      const sigMatch = text.match(/"sig":\s*"([^"]+)"/i) || text.match(/"version":\s*"([^"]+)"/i);
+      const etagHeader = res.headers.get("etag");
+      const lastModifiedHeader = res.headers.get("last-modified");
+
+      const sigValue = sigMatch ? sigMatch[1] : "";
+      if (sigValue) {
+        return `sig_${sigValue}`;
+      }
+      if (etagHeader || lastModifiedHeader) {
+        return `header_${etagHeader || ""}_${lastModifiedHeader || ""}`;
+      }
+
+      if (text.length > 0 && text.length < 5000) {
+        return `hash_${computeSHA256Sync(text).substring(0, 16)}`;
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [Cache] No se pudo verificar la firma de modificación liviana por GViz:", err);
+  }
+
+  // 2. Fallback ultra-liviano a export CSV de rango A1
+  try {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&range=A1:A1`;
+    const headRes = await fetch(csvUrl, { cache: "no-store" });
+    if (headRes.ok) {
+      const etag = headRes.headers.get("etag");
+      const lastMod = headRes.headers.get("last-modified");
+      if (etag || lastMod) {
+        return `head_${etag || ""}_${lastMod || ""}`;
+      }
+      const txt = await headRes.text();
+      return `csv_${computeSHA256Sync(txt).substring(0, 16)}`;
+    }
+  } catch (err) {
+    console.warn("⚠️ [Cache] Fallback de verificación liviana CSV:", err);
+  }
+
+  return null;
+}
+
+/**
+ * Lee el empaquetado del Dashboard guardado en LocalStorage bajo 'apex_dashboard_cache'
+ */
+export function getDashboardLocalCache(
+  sheetUrl: string = GOOGLE_SHEET_URL
+): ApexDashboardCacheData | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: ApexDashboardCacheData = JSON.parse(raw);
+    if (
+      parsed &&
+      Array.isArray(parsed.analyses) &&
+      parsed.analyses.length > 0 &&
+      parsed.versionSig
+    ) {
+      return parsed;
+    }
+  } catch (e) {
+    console.warn("⚠️ [Cache] Error al leer caché local:", e);
+  }
+  return null;
+}
+
+/**
+ * Guarda los datos completos y la firma de versión en LocalStorage bajo 'apex_dashboard_cache'
+ */
+export function saveDashboardLocalCache(
+  analyses: SheetAnalysisRecord[],
+  versionSig: string,
+  sheetUrl: string = GOOGLE_SHEET_URL
+): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    const cacheData: ApexDashboardCacheData = {
+      versionSig,
+      timestamp: Date.now(),
+      sheetUrl,
+      analyses,
+    };
+    window.localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(cacheData));
+  } catch (e) {
+    console.warn("⚠️ [Cache] Error al guardar en LocalStorage:", e);
+  }
+}
+
+/**
+ * Elimina la caché local para forzar un refresco limpio en vivo
+ */
+export function clearDashboardLocalCache(): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.removeItem(DASHBOARD_CACHE_KEY);
+  } catch (e) {
+    console.warn("⚠️ [Cache] Error al borrar LocalStorage:", e);
+  }
+}
+
 /**
  * Normaliza cadenas removiendo acentos, símbolos, espacios y mayúsculas para un cruce seguro y exacto
  */

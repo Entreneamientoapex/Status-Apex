@@ -37,6 +37,10 @@ import {
   testSpreadsheetConnection,
   updateTestStatusRemote,
   extractProjectCode,
+  fetchSheetLastModifiedSignature,
+  getDashboardLocalCache,
+  saveDashboardLocalCache,
+  clearDashboardLocalCache,
 } from "./utils/googleSheetsService";
 
 export default function App() {
@@ -142,11 +146,95 @@ export default function App() {
     }
   };
 
-  // Load / Sincronizar Google Sheets Data
-  const loadGoogleSheetsData = async (showNotifications = true) => {
+  const applyAnalysesToDashboard = (
+    analyses: SheetAnalysisRecord[],
+    showNotifications = false,
+    fromCache = false
+  ) => {
+    if (!analyses || analyses.length === 0) return;
+    setHistory(analyses);
+    const hasLiveRecord = analyses.some((a) => a.isLiveFromGoogle);
+    if (hasLiveRecord || fromCache) {
+      setIsLiveFromGoogle(true);
+      setNeedsPermissionNotice(false);
+    }
+
+    let selected = analyses.find((a) => a.id === activeAnalysisId);
+    if (!selected && typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramTest = urlParams.get("test") || urlParams.get("tab");
+      if (paramTest) {
+        const decodedParam = decodeURIComponent(paramTest).toLowerCase();
+        selected = analyses.find(
+          (a) =>
+            a.id.toLowerCase() === decodedParam ||
+            a.name.toLowerCase() === decodedParam ||
+            a.sheetName.toLowerCase() === decodedParam
+        );
+      }
+    }
+    if (!selected) {
+      selected = analyses[0];
+    }
+
+    setActiveAnalysisId(selected.id);
+    setRecords(selected.records);
+    setCurrentBatch({
+      id: selected.id,
+      fileName: selected.name,
+      fileType: "document",
+      uploadDate: selected.createdAt.split("T")[0],
+      totalAgents: selected.totalAgents,
+      approvedCount: selected.approvedCount,
+      failedCount: selected.failedCount,
+      averageScore: selected.averageScore,
+      trainingTopic: selected.trainingTopic,
+      trainer: selected.trainer,
+      records: selected.records,
+    });
+
+    if (showNotifications) {
+      if (fromCache) {
+        showToast(`⚡ Datos validados al 100% desde caché local (${analyses.length} evaluaciones).`, "success");
+      } else if (hasLiveRecord) {
+        showToast(`¡Conectado en vivo! Sincronizadas ${analyses.length} hojas desde Google Sheets.`, "success");
+      } else {
+        showToast("Google Sheet en modo restringido. Se muestran datos base.", "warning");
+      }
+    }
+  };
+
+  // Load / Sincronizar Google Sheets Data con Estrategia de Caché Inteligente & Control de Peso Pluma
+  const loadGoogleSheetsData = async (showNotifications = true, forceClean = false) => {
     setIsLoadingSheets(true);
+
+    // 1. Si se solicita sincronización forzada manual, borrar caché de LocalStorage de inmediato
+    if (forceClean) {
+      clearDashboardLocalCache();
+      console.log("🧹 [Cache Protocol] Sincronización manual: LocalStorage 'apex_dashboard_cache' eliminado.");
+    }
+
     try {
-      // 1. Test connection to see if public access is enabled
+      // 2. Revisar si existen datos válidos guardados en memoria del navegador
+      const cached = !forceClean ? getDashboardLocalCache(GOOGLE_SHEET_URL) : null;
+
+      if (cached && cached.analyses && cached.analyses.length > 0) {
+        // PROTOCOLO DE CONTROL DE PESO PLUMA:
+        // Petición ultra-liviana inicial consultando únicamente el metadato / firma de modificación
+        const currentSig = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL);
+
+        if (currentSig && cached.versionSig && currentSig === cached.versionSig) {
+          // FECHA/FIRMA ES IGUAL: Renderizar de inmediato usando LocalStorage y cancelar fetch pesado
+          console.log(`⚡ [Cache Hit] Google Sheets sin cambios (sig: ${currentSig}). Usando 'apex_dashboard_cache' (Ahorro de datos 100%).`);
+          applyAnalysesToDashboard(cached.analyses, showNotifications, true);
+          setIsLoadingSheets(false);
+          return;
+        } else {
+          console.log(`🔄 [Cache Miss / Modificado] Nueva firma en Google Sheets (${currentSig} vs ${cached.versionSig}). Ejecutando fetch completo.`);
+        }
+      }
+
+      // 3. FETCH COMPLETO (cuando la fecha es diferente, no hay caché o es forzado):
       const connTest = await testSpreadsheetConnection(GOOGLE_SHEET_URL);
       if (connTest.needsPermission) {
         setNeedsPermissionNotice(true);
@@ -156,58 +244,13 @@ export default function App() {
         setIsLiveFromGoogle(true);
       }
 
-      // 2. Fetch all tab analyses
       const analyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL);
       if (analyses && analyses.length > 0) {
-        setHistory(analyses);
-        const hasLiveRecord = analyses.some((a) => a.isLiveFromGoogle);
-        if (hasLiveRecord) {
-          setIsLiveFromGoogle(true);
-          setNeedsPermissionNotice(false);
-        }
-
-        // Select tab by URL parameter (?test= or ?tab=), keep active, or select first by default
-        let selected = analyses.find((a) => a.id === activeAnalysisId);
-        if (!selected && typeof window !== "undefined") {
-          const urlParams = new URLSearchParams(window.location.search);
-          const paramTest = urlParams.get("test") || urlParams.get("tab");
-          if (paramTest) {
-            const decodedParam = decodeURIComponent(paramTest).toLowerCase();
-            selected = analyses.find(
-              (a) =>
-                a.id.toLowerCase() === decodedParam ||
-                a.name.toLowerCase() === decodedParam ||
-                a.sheetName.toLowerCase() === decodedParam
-            );
-          }
-        }
-        if (!selected) {
-          selected = analyses[0];
-        }
-
-        setActiveAnalysisId(selected.id);
-        setRecords(selected.records);
-        setCurrentBatch({
-          id: selected.id,
-          fileName: selected.name,
-          fileType: "document",
-          uploadDate: selected.createdAt.split("T")[0],
-          totalAgents: selected.totalAgents,
-          approvedCount: selected.approvedCount,
-          failedCount: selected.failedCount,
-          averageScore: selected.averageScore,
-          trainingTopic: selected.trainingTopic,
-          trainer: selected.trainer,
-          records: selected.records,
-        });
-
-        if (showNotifications) {
-          if (hasLiveRecord) {
-            showToast(`¡Conectado en vivo! Sincronizadas ${analyses.length} hojas desde Google Sheets.`, "success");
-          } else {
-            showToast("Google Sheet en modo restringido. Se muestran datos base.", "warning");
-          }
-        }
+        // Obtener la firma actual para persistir en la nueva caché
+        const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL)) || new Date().toISOString();
+        saveDashboardLocalCache(analyses, currentSig, GOOGLE_SHEET_URL);
+        console.log(`💾 [Cache Guardada] 'apex_dashboard_cache' actualizada con ${analyses.length} hojas y firma: ${currentSig}`);
+        applyAnalysesToDashboard(analyses, showNotifications, false);
       }
     } catch (err: any) {
       console.warn("Could not load from Google Sheets:", err);
@@ -219,8 +262,14 @@ export default function App() {
     }
   };
 
+  // Botón físico manual de sincronización: Forzar borrado de caché y fetch limpio en vivo
+  const handleManualSync = () => {
+    clearDashboardLocalCache();
+    loadGoogleSheetsData(true, true);
+  };
+
   useEffect(() => {
-    loadGoogleSheetsData(false);
+    loadGoogleSheetsData(false, false);
   }, []);
 
   // Switch Active Analysis / Tab
@@ -714,7 +763,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
               {/* Botón 3 (Blanco): Sincronizar */}
               <button
                 id="btn-admin-sincronizar"
-                onClick={() => loadGoogleSheetsData(true)}
+                onClick={handleManualSync}
                 disabled={isLoadingSheets}
                 className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-[#2D332A] hover:bg-[#F1F3EE] bg-white border border-[#D9DED4] rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                 title="Refrescar datos de la planilla"
@@ -778,7 +827,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
           activeAnalysisId={activeAnalysisId}
           isLoadingHistory={isLoadingSheets}
           onSelectAnalysis={handleSelectAnalysis}
-          onRefreshSheets={() => loadGoogleSheetsData(true)}
+          onRefreshSheets={handleManualSync}
           isAdmin={isAdmin}
           selectedTestIds={selectedTestIds}
           onToggleSelectTest={handleToggleSelectTest}
@@ -878,7 +927,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       <GoogleSheetConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
-        onRefreshData={() => loadGoogleSheetsData(true)}
+        onRefreshData={handleManualSync}
       />
 
       {/* Modal: Bandeja de Notificaciones (Admin) */}
