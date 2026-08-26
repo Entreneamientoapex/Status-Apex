@@ -29,7 +29,7 @@ import {
   Lock,
   Mail,
 } from "lucide-react";
-import { GOOGLE_SHEET_URL } from "./utils/googleSheetsConfig";
+import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL } from "./utils/googleSheetsConfig";
 import {
   SheetAnalysisRecord,
   fetchAllSheetAnalyses,
@@ -220,8 +220,8 @@ export default function App() {
 
       if (cached && cached.analyses && cached.analyses.length > 0) {
         // PROTOCOLO DE CONTROL DE PESO PLUMA:
-        // Petición ultra-liviana inicial consultando únicamente el metadato / firma de modificación
-        const currentSig = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL);
+        // Petición ultra-liviana inicial consultando únicamente el metadato / firma de modificación a Apps Script
+        const currentSig = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
 
         if (currentSig && cached.versionSig && currentSig === cached.versionSig) {
           // FECHA/FIRMA ES IGUAL: Renderizar de inmediato usando LocalStorage y cancelar fetch pesado
@@ -244,12 +244,15 @@ export default function App() {
         setIsLiveFromGoogle(true);
       }
 
-      const analyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL);
+      const analyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
       if (analyses && analyses.length > 0) {
-        // Obtener la firma actual para persistir en la nueva caché
-        const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL)) || new Date().toISOString();
+        // Obtener la firma/token Z1 actual para persistir en la nueva caché
+        const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL)) || String(Date.now());
         saveDashboardLocalCache(analyses, currentSig, GOOGLE_SHEET_URL);
-        console.log(`💾 [Cache Guardada] 'apex_dashboard_cache' actualizada con ${analyses.length} hojas y firma: ${currentSig}`);
+        try {
+          localStorage.setItem("apex_z1_token", currentSig);
+        } catch {}
+        console.log(`💾 [Cache Guardada] 'apex_dashboard_cache' y token Z1 ("${currentSig}") actualizados con ${analyses.length} evaluaciones.`);
         applyAnalysesToDashboard(analyses, showNotifications, false);
       }
     } catch (err: any) {
@@ -265,11 +268,52 @@ export default function App() {
   // Botón físico manual de sincronización: Forzar borrado de caché y fetch limpio en vivo
   const handleManualSync = () => {
     clearDashboardLocalCache();
+    try {
+      localStorage.clear();
+    } catch {}
     loadGoogleSheetsData(true, true);
   };
 
   useEffect(() => {
+    // 1. Carga inicial al montar el componente
     loadGoogleSheetsData(false, false);
+
+    // 2. Centinela de Cambios en Segundo Plano por Token Z1 (Background Polling cada 5 segundos)
+    const POLL_INTERVAL_MS = 5000;
+    const sentinelInterval = setInterval(async () => {
+      try {
+        // Petición ultra-liviana meta-fetch exclusivamente del token puro de la celda Z1 al endpoint doGet de Apps Script
+        const currentToken = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
+        const cached = getDashboardLocalCache(GOOGLE_SHEET_URL);
+        const savedToken = (typeof window !== "undefined" ? localStorage.getItem("apex_z1_token") : null) || cached?.versionSig;
+
+        if (currentToken) {
+          if (!savedToken || currentToken !== savedToken) {
+            // El número de la celda Z1 en el Excel es DIFERENTE al guardado en la PC del usuario:
+            console.log(
+              `🔄 [Centinela Z1] Cambio de token detectado en Excel Z1 (Remoto: "${currentToken}" vs Local: "${savedToken}"). Limpiando caché y actualizando en vivo...`
+            );
+            // 1. Limpieza inmediata de caché local
+            clearDashboardLocalCache();
+            try {
+              localStorage.clear();
+            } catch {}
+            // 2. Sincronización en vivo del JSON principal para refrescar tarjetas visuales al instante
+            await loadGoogleSheetsData(false, true);
+          } else {
+            // El número de la celda Z1 NO cambió: mantener LocalStorage intacto (0 bytes transferidos)
+            console.log(`🛡️ [Centinela Z1] Token Z1 sin cambios ("${currentToken}"). LocalStorage intacto (0 bytes transferidos).`);
+          }
+        }
+      } catch (err) {
+        console.warn("⚠️ [Centinela Z1] Error en chequeo de token Z1:", err);
+      }
+    }, POLL_INTERVAL_MS);
+
+    // Limpieza de intervalo al desmontar el componente
+    return () => {
+      clearInterval(sentinelInterval);
+    };
   }, []);
 
   // Switch Active Analysis / Tab

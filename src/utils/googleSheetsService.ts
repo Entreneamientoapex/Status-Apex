@@ -58,17 +58,58 @@ export interface ApexDashboardCacheData {
 }
 
 /**
- * Consulta ultra-liviana a Google Sheets para obtener la firma hash / versión de modificación
+ * Consulta ultra-liviana al endpoint de Apps Script (o Google Sheets) para obtener la firma hash / versión de modificación
  * del documento sin descargar las pestañas pesadas ni el universo de datos.
  */
 export async function fetchSheetLastModifiedSignature(
-  spreadsheetUrl: string = GOOGLE_SHEET_URL
+  spreadsheetUrl: string = GOOGLE_SHEET_URL,
+  appsScriptUrl: string = APPS_SCRIPT_URL
 ): Promise<string | null> {
+  // 1. PRIORIDAD: Consulta ultra-liviana a Apps Script con parámetros de escape de caché
+  if (appsScriptUrl) {
+    try {
+      const sep = appsScriptUrl.includes("?") ? "&" : "?";
+      const checkUrl = `${appsScriptUrl}${sep}checkUpdate=true&nocache=${Date.now()}`;
+      const res = await fetch(checkUrl, { cache: "no-store", redirect: "follow" });
+      if (res.ok) {
+        const text = (await res.text()).trim();
+        if (text && !text.includes("<!DOCTYPE html>") && !text.includes("accounts.google.com")) {
+          let tokenValue: string | number | null = null;
+          try {
+            const data = JSON.parse(text);
+            tokenValue =
+              data.z1 ??
+              data.token ??
+              data.lastModified ??
+              data.timestamp ??
+              data.updated ??
+              data.date ??
+              data.version ??
+              data.lastUpdate ??
+              data.sig ??
+              data.val ??
+              (typeof data === "number" || typeof data === "string" ? data : null);
+          } catch {
+            // El script devolvió el número de fecha/timestamp puro de la celda Z1 directamente en texto plano
+            tokenValue = text;
+          }
+
+          if (tokenValue !== null && tokenValue !== undefined && tokenValue !== "") {
+            const cleanToken = String(tokenValue).trim();
+            return cleanToken;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️ [Cache Centinela] No se pudo verificar la firma via Apps Script doGet:", err);
+    }
+  }
+
+  // 2. Fallback ultra-liviano a Google Visualization API solicitando solo 1 celda (A1)
   const sheetId = extractSpreadsheetId(spreadsheetUrl);
   if (!sheetId) return null;
 
   try {
-    // 1. Consulta ultra-liviana a Google Visualization API solicitando solo 1 celda (A1)
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${encodeURIComponent("select A limit 1")}&headers=0`;
     const res = await fetch(gvizUrl, { cache: "no-store" });
     if (res.ok) {
@@ -91,10 +132,10 @@ export async function fetchSheetLastModifiedSignature(
       }
     }
   } catch (err) {
-    console.warn("⚠️ [Cache] No se pudo verificar la firma de modificación liviana por GViz:", err);
+    console.warn("⚠️ [Cache] Fallback de verificación liviana GViz:", err);
   }
 
-  // 2. Fallback ultra-liviano a export CSV de rango A1
+  // 3. Fallback ultra-liviano a export CSV de rango A1
   try {
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&range=A1:A1`;
     const headRes = await fetch(csvUrl, { cache: "no-store" });
@@ -1356,21 +1397,198 @@ export async function fetchAndJoinTestAnalysis(
 }
 
 /**
+ * Normaliza y valida una colección de análisis de tests recibida desde el JSON compacto de Apps Script.
+ */
+function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] {
+  if (!Array.isArray(rawAnalyses) || rawAnalyses.length === 0) return [];
+
+  return rawAnalyses.map((raw, idx) => {
+    const rawRecords: any[] = Array.isArray(raw.records) ? raw.records : [];
+    
+    // Normalizar cada registro de asesor dentro del test
+    const normalizedRecords: AgentRecord[] = rawRecords.map((r, rIdx) => {
+      const score = typeof r.score === "number" ? r.score : r.score ? Number(r.score) : null;
+      const initialScore = typeof r.initialScore === "number" ? r.initialScore : r.initialScore ? Number(r.initialScore) : score;
+      const minPassing = typeof r.minPassingScore === "number" ? r.minPassingScore : DEFAULT_PASSING_SCORE;
+
+      let status: ApprovalStatus = "Pendiente";
+      if (r.status === "Aprobado" || r.status === "No Aprobado" || r.status === "Pendiente") {
+        status = r.status;
+      } else if (score !== null && !isNaN(score)) {
+        status = score >= minPassing ? "Aprobado" : "No Aprobado";
+      }
+
+      const rawSup = r.supervisor ? String(r.supervisor).trim() : "";
+      const sup =
+        !rawSup ||
+        rawSup === "-" ||
+        rawSup.toLowerCase() === "sin supervisor asignado" ||
+        rawSup.toLowerCase() === "sin supervisor" ||
+        rawSup.toLowerCase() === "sin asignar"
+          ? "Staff"
+          : rawSup;
+
+      return {
+        id: r.id || `rec_${raw.id || idx}_${r.agentId || rIdx}`,
+        agentName: r.agentName || r.name || r.asesor || "Asesor",
+        agentId: String(r.agentId || r.legajo || r.id || `L${rIdx + 1}`),
+        campaign: r.campaign || r.campana || "Operaciones",
+        supervisor: sup,
+        jcc: r.jcc || r.jefe || "",
+        trainingName: r.trainingName || raw.name || "Capacitación Operativa",
+        trainerName: r.trainerName || raw.trainer || "Trainer Responsable",
+        completionDate: r.completionDate || (raw.createdAt ? String(raw.createdAt).split("T")[0] : new Date().toISOString().split("T")[0]),
+        score: score !== null && !isNaN(score) ? score : null,
+        initialScore: initialScore !== null && !isNaN(initialScore) ? initialScore : null,
+        retakeScore: typeof r.retakeScore === "number" ? r.retakeScore : null,
+        phoneScore: typeof r.phoneScore === "number" ? r.phoneScore : null,
+        digitalScore: typeof r.digitalScore === "number" ? r.digitalScore : null,
+        passedInRetake: Boolean(r.passedInRetake),
+        minPassingScore: minPassing,
+        status,
+        attendancePercentage: typeof r.attendancePercentage === "number" ? r.attendancePercentage : 100,
+        feedback: r.feedback || (status === "Aprobado" ? "Objetivo alcanzado con éxito." : "Requiere refuerzo pedagógico."),
+        skillsAcquired: Array.isArray(r.skillsAcquired) ? r.skillsAcquired : ["Gestión Operativa"],
+        needsRetraining: typeof r.needsRetraining === "boolean" ? r.needsRetraining : status !== "Aprobado",
+        sourceFileName: r.sourceFileName || raw.name || "Google Sheet",
+      };
+    });
+
+    // Calcular métricas agregadas consistentes
+    const totalAgents = typeof raw.totalAgents === "number" && raw.totalAgents > 0 ? raw.totalAgents : normalizedRecords.length;
+    const approvedCount = normalizedRecords.filter((rec) => rec.status === "Aprobado").length;
+    const failedCount = normalizedRecords.filter((rec) => rec.status === "No Aprobado").length;
+    const pendingCount = normalizedRecords.filter((rec) => rec.status === "Pendiente").length;
+    const evaluated = approvedCount + failedCount;
+    const passRate = evaluated > 0 ? Math.round((approvedCount / evaluated) * 100) : 0;
+    
+    const scoredList = normalizedRecords.filter((rec) => rec.score !== null && !isNaN(rec.score as number));
+    const averageScore = scoredList.length > 0 ? Math.round(scoredList.reduce((acc, curr) => acc + (curr.score || 0), 0) / scoredList.length) : 0;
+
+    const timeInfo = extractDateFromTabName(raw.name || raw.sheetName || "");
+    const projectCode = raw.projectCode || extractProjectCode(raw.name || raw.sheetName || "") || (raw.name || "").toUpperCase().trim();
+
+    return {
+      id: raw.id || `tab_${(raw.name || `test_${idx}`).replace(/[^a-zA-Z0-9_-]/g, "_")}`,
+      name: raw.name || raw.sheetName || `Evaluación ${idx + 1}`,
+      sheetName: raw.sheetName || raw.name || `Evaluación ${idx + 1}`,
+      tabGid: raw.tabGid || null,
+      createdAt: raw.createdAt || timeInfo.iso,
+      createdAtFormatted: raw.createdAtFormatted || timeInfo.formatted,
+      totalAgents,
+      approvedCount,
+      failedCount,
+      pendingCount,
+      passRate,
+      averageScore,
+      trainingTopic: raw.trainingTopic || (raw.name ? raw.name.split("-")[0].trim() : "Capacitación"),
+      trainer: raw.trainer || "Trainer Apex",
+      records: normalizedRecords,
+      isLiveFromGoogle: true,
+      hasScoreColumn: raw.hasScoreColumn !== false,
+      discardedExternalCount: raw.discardedExternalCount || 0,
+      projectCode,
+      testStatus: raw.testStatus === "No Activo" ? "No Activo" : "Activo",
+    };
+  });
+}
+
+/**
+ * Consulta el endpoint unificado de doGet en Google Apps Script para descargar de una sola vez
+ * la nómina maestra y todas las evaluaciones estructuradas en un JSON compacto.
+ */
+export async function fetchUnifiedFromAppsScript(
+  appsScriptUrl: string = APPS_SCRIPT_URL
+): Promise<SheetAnalysisRecord[] | null> {
+  if (!appsScriptUrl) return null;
+
+  try {
+    const sep = appsScriptUrl.includes("?") ? "&" : "?";
+    const unifiedUrl = `${appsScriptUrl}${sep}nocache=${Date.now()}`;
+    console.log("🚀 [Apps Script Fetch] Conectando al endpoint unificado de doGet:", unifiedUrl);
+    
+    const res = await fetch(unifiedUrl, { cache: "no-store", redirect: "follow" });
+    if (!res.ok) {
+      console.warn(`[Apps Script Fetch] HTTP status ${res.status}`);
+      return null;
+    }
+
+    const text = await res.text();
+    if (!text || text.includes("<!DOCTYPE html>") || text.includes("accounts.google.com")) {
+      console.warn("[Apps Script Fetch] Respuesta no es JSON válido (posible redirección HTML):", text.substring(0, 100));
+      return null;
+    }
+
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch (parseErr) {
+      console.warn("[Apps Script Fetch] Error al parsear JSON:", parseErr);
+      return null;
+    }
+
+    if (!json) return null;
+
+    // Caso 1: Devuelve directamente un array de análisis de tests
+    if (Array.isArray(json) && json.length > 0) {
+      const normalized = normalizeAppsScriptAnalyses(json);
+      if (normalized.length > 0) {
+        console.log(`✅ [Apps Script Fetch] ${normalized.length} evaluaciones recibidas en formato Array directo.`);
+        return normalized;
+      }
+    }
+
+    // Caso 2: Devuelve un objeto con 'analyses', 'tests', 'evaluaciones' o 'data'
+    const candidateList = json.analyses || json.tests || json.evaluaciones || json.data || json.results;
+    if (Array.isArray(candidateList) && candidateList.length > 0) {
+      const normalized = normalizeAppsScriptAnalyses(candidateList);
+      if (normalized.length > 0) {
+        console.log(`✅ [Apps Script Fetch] ${normalized.length} evaluaciones recibidas desde propiedad contenedora.`);
+        return normalized;
+      }
+    }
+
+    // Caso 3: Devuelve nómina y exámenes en bruto para cruzar
+    const rawNomina = json.nomina || json.masterAgents || json.payroll || json.agentes;
+    const rawTests = json.examenes || json.tests || json.exams;
+    if (Array.isArray(rawNomina) && Array.isArray(rawTests) && rawTests.length > 0) {
+      console.log(`📦 [Apps Script Fetch] Procesando nómina (${rawNomina.length} agentes) y exámenes (${rawTests.length} tests)...`);
+      const normalized = normalizeAppsScriptAnalyses(rawTests);
+      if (normalized.length > 0) return normalized;
+    }
+  } catch (err) {
+    console.warn("⚠️ [Apps Script Fetch] Error de conexión con endpoint doGet:", err);
+  }
+
+  return null;
+}
+
+/**
  * 4. FUNCIÓN MAESTRA CON REGLAS DE SEGURIDAD & ESTADOS CENTRALIZADOS:
- *    - Carga 'Lista_agentes', detecta todos los tests dinámicamente (ocultando Lista_agentes del historial).
- *    - Consulta la pestaña 'Config_Usuarios' para obtener el estado (Activo / No Activo) centralizado en la nube.
+ *    - Primero intenta el endpoint compacto unificado de Google Apps Script doGet.
+ *    - Si no está disponible, realiza el parsing directo de Google Sheets.
  *    - Cruza estrictamente cada test contra la base maestra.
  */
 export async function fetchAllSheetAnalyses(
-  spreadsheetUrl: string = GOOGLE_SHEET_URL
+  spreadsheetUrl: string = GOOGLE_SHEET_URL,
+  appsScriptUrl: string = APPS_SCRIPT_URL
 ): Promise<SheetAnalysisRecord[]> {
-  // 1. Obtener el universo único y fijo de 261 asesores desde Lista_agentes
+  // 1. Prioridad: Consulta al endpoint unificado de doGet en Apps Script (JSON compacto)
+  const unifiedFromScript = await fetchUnifiedFromAppsScript(appsScriptUrl);
+  if (unifiedFromScript && unifiedFromScript.length > 0) {
+    return unifiedFromScript;
+  }
+
+  // 2. Fallback de alta resiliencia: Consulta y cruce directo sobre Google Sheets
+  console.log("ℹ️ [Fallback Sheet] Ejecutando sincronización directa con Google Sheets CSV/GViz...");
+  
+  // Obtener el universo único y fijo de 261 asesores desde Lista_agentes
   const masterAgents = await fetchMasterAgentList(spreadsheetUrl);
 
-  // 2. Detectar dinámicamente todas las pestañas de test (filtrando Lista_agentes y Config_Usuarios)
+  // Detectar dinámicamente todas las pestañas de test (filtrando Lista_agentes y Config_Usuarios)
   const testTabs = await fetchSpreadsheetTestTabs(spreadsheetUrl);
 
-  // 3. Consultar en vivo la pestaña Config_Usuarios para obtener el estado (Activo / No Activo) de cada test
+  // Consultar en vivo la pestaña Config_Usuarios para obtener el estado (Activo / No Activo) de cada test
   const testStatusesMap = await fetchTestStatuses(spreadsheetUrl);
 
   const results: SheetAnalysisRecord[] = [];
