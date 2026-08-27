@@ -49,7 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeSheetName,
   isLiveConnection = false,
 }) => {
-  const approvalRate = totalAgents > 0 ? Math.round((approvedCount / totalAgents) * 100) : 0;
+  const rawApprovalRate = totalAgents > 0 ? (approvedCount / totalAgents) * 100 : 0;
+  const approvalRate = rawApprovalRate % 1 === 0 ? rawApprovalRate.toString() : rawApprovalRate.toFixed(1);
 
   return (
     <header className="sticky top-0 z-30 bg-[#F9F9F7]/95 backdrop-blur border-b border-[#D9DED4] text-[#2D332A] shadow-xs">

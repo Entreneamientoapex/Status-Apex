@@ -74,19 +74,22 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
 
   const needsRetrainingCount = records.filter((r) => r.needsRetraining).length;
 
-  // 5. CARD 5 (Porcentaje de Éxito): Calcula dinámicamente la efectividad real en base a: (Aprobados / Total de Evaluados) * 100.
+  // Porcentajes internos calculados sobre el Total Agentes activo (universo filtrado)
+  const approvedPct = total > 0 ? (approved / total) * 100 : 0;
+  const failedPct = total > 0 ? (failed / total) * 100 : 0;
+  const pendingPct = total > 0 ? (pending / total) * 100 : 0;
+
+  // Formateador con un decimal o entero prolijo
+  const formatPct = (val: number): string => {
+    if (val === 0 || isNaN(val)) return "0%";
+    return val % 1 === 0 ? `${val}%` : `${val.toFixed(1)}%`;
+  };
+
+  // 5. CARD 5 (Porcentaje de Éxito): Calcula la efectividad real en base a: (Aprobados / Total de Evaluados) * 100.
   const totalEvaluated = approved + failed;
-  const approvalRate = totalEvaluated > 0 
+  const successRate = totalEvaluated > 0 
     ? Math.round((approved / totalEvaluated) * 100) 
     : (total > 0 && pending === 0 ? Math.round((approved / total) * 100) : 0);
-
-  const failedRate = totalEvaluated > 0 
-    ? Math.round((failed / totalEvaluated) * 100) 
-    : 0;
-
-  const pendingRate = total > 0 
-    ? Math.round((pending / total) * 100) 
-    : 0;
 
   const handleCardClick = (status: ApprovalStatus | "ALL") => {
     if (onOpenStatusModal) {
@@ -244,7 +247,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
                 {approved}
               </span>
               <span className="text-xs font-semibold text-[#4F7A4F]">
-                ({approvalRate}%)
+                ({formatPct(approvedPct)})
               </span>
             </div>
             <span className="text-[10px] font-bold text-[#4F7A4F] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 bg-[#E6F3E6] px-1.5 py-0.5 rounded border border-[#C6DEC6]">
@@ -254,7 +257,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           <div className="mt-2.5 w-full bg-[#E8EAE3] rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-[#4F7A4F] h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${approvalRate}%` }}
+              style={{ width: `${Math.min(100, approvedPct)}%` }}
             ></div>
           </div>
         </div>
@@ -287,7 +290,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
                 {failed}
               </span>
               <span className="text-xs font-semibold text-[#9E4A4A]">
-                ({failedRate}%)
+                ({formatPct(failedPct)})
               </span>
             </div>
             <span className="text-[10px] font-bold text-[#9E4A4A] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 bg-[#FDF1F1] px-1.5 py-0.5 rounded border border-[#F0D5D5]">
@@ -328,7 +331,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
                 {pending}
               </span>
               <span className="text-xs font-semibold text-[#8C733E]">
-                ({pendingRate}%)
+                ({formatPct(pendingPct)})
               </span>
             </div>
             <span className="text-[10px] font-bold text-[#8C733E] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 bg-[#FAF5E6] px-1.5 py-0.5 rounded border border-[#EBDDBF]">
@@ -356,14 +359,14 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           <div className="mt-3 flex items-baseline gap-2">
             <span
               className={`text-2xl sm:text-3xl font-light tracking-tight ${
-                approvalRate >= 80
+                successRate >= 80
                   ? "text-[#4F7A4F]"
-                  : approvalRate >= 60
+                  : successRate >= 60
                   ? "text-[#2D332A]"
                   : "text-[#9E4A4A]"
               }`}
             >
-              {approvalRate}%
+              {successRate}%
             </span>
             <span className="text-xs text-[#6B7366]">
               ({approved}/{totalEvaluated > 0 ? totalEvaluated : total} {totalEvaluated > 0 ? "evaluados" : "total"})
@@ -372,13 +375,13 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           <div className="mt-2.5 w-full bg-[#E8EAE3] rounded-full h-1.5 overflow-hidden">
             <div
               className={`h-1.5 rounded-full transition-all duration-500 ${
-                approvalRate >= 80
+                successRate >= 80
                   ? "bg-[#4F7A4F]"
-                  : approvalRate >= 60
+                  : successRate >= 60
                   ? "bg-[#8DA189]"
                   : "bg-[#9E4A4A]"
               }`}
-              style={{ width: `${Math.min(100, approvalRate)}%` }}
+              style={{ width: `${Math.min(100, successRate)}%` }}
             ></div>
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[#6B7366]">
