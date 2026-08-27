@@ -611,7 +611,7 @@ export default function App() {
 
       // Destinatarios y Asunto institucional preconfigurado para Gmail
       const toRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,ar_soporte_supervisores@apexamerica.com";
-      const ccRecipients = "matiasgabriel.diaz@apexamerica.com,teco_calidad_soporte@apexamerica.com,sixto.tanaka@apexamerica.com,lautaro.aliaga@apexamerica.com,jose.perini@apexamerica.com,RIPENALOZA@personal.com.ar,vanesacarolina.alegre@apexamerica.com";
+      const ccRecipients = "matiasgabriel.diaz@apexamerica.com,teco_calidad_soporte@apexamerica.com,sixto.tanaka@apexamerica.com,lautaro.aliaga@apexamerica.com,jose.perini@apexamerica.com,vanesacarolina.alegre@apexamerica.com";
       const asunto = "📢 STATUS REALIZADO: Reporte Consolidado de Avance";
 
       const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(toRecipients)}&cc=${encodeURIComponent(ccRecipients)}&su=${encodeURIComponent(asunto)}`;
@@ -646,7 +646,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
     }
 
     const toRecipients = "EstrategiadelEntrenamiento@teco.com.ar,EntrenamientoPresencial@personal.com.ar";
-    const ccRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,matiasgabriel.diaz@apexamerica.com,jose.perini@apexamerica.com,JGUILBOURG@personal.com.ar,GaASoto@personal.com.ar,vanesacarolina.alegre@apexamerica.com";
+    const ccRecipients = "Ar_Teco_JCC_Soporte@apexamerica.com,matiasgabriel.diaz@apexamerica.com,jose.perini@apexamerica.com,vanesacarolina.alegre@apexamerica.com";
     const asuntoCodificado = encodeURIComponent("Solicitud de Matriculación - [Nombre del Curso / Test]");
     const gmailMatriculacionUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(toRecipients)}&cc=${encodeURIComponent(ccRecipients)}&su=${asuntoCodificado}`;
     window.open(gmailMatriculacionUrl, "_blank");

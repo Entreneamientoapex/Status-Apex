@@ -152,7 +152,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
   return (
     <div className="bg-white border border-[#D9DED4] rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs h-full min-h-[360px]">
       <div>
-        {/* Header: Título "JCC", Botón Mostrar Todos los JCC y Contador */}
+        {/* Header: Título "JCC/CC&T", Botón Mostrar Todos los JCC y Contador */}
         <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[#E8EAE3]">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-[#EAEFF8] text-[#2B579A] flex items-center justify-center shrink-0 border border-[#D0DDF0]">
@@ -160,7 +160,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
             </div>
             <div>
               <h2 className="text-xs sm:text-sm font-bold text-[#2D332A]">
-                JCC
+                JCC/CC&T
               </h2>
             </div>
           </div>
