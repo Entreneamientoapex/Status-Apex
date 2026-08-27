@@ -205,7 +205,12 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
                 {agent.jcc && agent.jcc !== "-" && (
                   <p className="flex items-center gap-1 text-[#2B579A] font-medium">
                     <Briefcase className="h-3 w-3" />
-                    <span>JCC: {agent.jcc}</span>
+                    <span>
+                      {agent.jcc.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                        ? "CC&T: "
+                        : "JCC: "}
+                      {agent.jcc}
+                    </span>
                   </p>
                 )}
               </div>

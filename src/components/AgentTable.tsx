@@ -1141,8 +1141,18 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                   {agent.jcc && agent.jcc !== "-" && (
                                     <>
                                       <span>•</span>
-                                      <span className="text-[#2B579A] font-medium" title={`JCC: ${agent.jcc}`}>
-                                        JCC: {agent.jcc}
+                                      <span
+                                        className="text-[#2B579A] font-medium"
+                                        title={`${
+                                          agent.jcc.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                                            ? "CC&T"
+                                            : "JCC"
+                                        }: ${agent.jcc}`}
+                                      >
+                                        {agent.jcc.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                                          ? "CC&T: "
+                                          : "JCC: "}
+                                        {agent.jcc}
                                       </span>
                                     </>
                                   )}
