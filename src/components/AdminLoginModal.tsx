@@ -45,8 +45,15 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onLogout,
   showToast,
 }) => {
-  // Current user state
-  const [currentAdminUser, setCurrentAdminUser] = useState<ConfigUser | null>(null);
+  // Current user state (restored from sessionStorage if active)
+  const [currentAdminUser, setCurrentAdminUser] = useState<ConfigUser | null>(() => {
+    try {
+      const stored = sessionStorage.getItem("apex_admin_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // View state
   const [view, setView] = useState<ModalView>(isAdmin ? "logged_in" : "login");

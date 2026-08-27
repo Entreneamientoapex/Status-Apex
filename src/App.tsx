@@ -49,8 +49,14 @@ export default function App() {
   const [currentBatch, setCurrentBatch] = useState<TrainingBatch>(INITIAL_BATCH);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-  // Admin Mode Authentication State (false by default)
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  // Admin Mode Authentication State (initialized from sessionStorage)
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem("apex_admin_session") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
   const [togglingTestId, setTogglingTestId] = useState<string | null>(null);
@@ -931,11 +937,25 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
         showToast={showToast}
         onLoginSuccess={(user) => {
           setIsAdmin(true);
+          try {
+            sessionStorage.setItem("apex_admin_session", "true");
+            if (user) {
+              sessionStorage.setItem("apex_admin_user", JSON.stringify(user));
+            }
+          } catch (e) {
+            console.error("Error al persistir sesión en sessionStorage:", e);
+          }
           const userName = user?.name || user?.username || "Trainer";
           showToast(`¡Bienvenido ${userName}! Modo Administrador activado con éxito.`, "success");
         }}
         onLogout={() => {
           setIsAdmin(false);
+          try {
+            sessionStorage.removeItem("apex_admin_session");
+            sessionStorage.removeItem("apex_admin_user");
+          } catch (e) {
+            console.error("Error al remover sesión en sessionStorage:", e);
+          }
           showToast("Sesión de administrador cerrada.", "info");
         }}
       />
