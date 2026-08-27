@@ -284,9 +284,11 @@ export default function App() {
     // 1. Carga inicial al montar el componente
     loadGoogleSheetsData(false, false);
 
-    // 2. Centinela de Cambios en Segundo Plano por Token Z1 (Background Polling cada 5 segundos)
-    const POLL_INTERVAL_MS = 5000;
-    const sentinelInterval = setInterval(async () => {
+    // 2. Centinela de Cambios en Segundo Plano por Token Z1 con Page Visibility API (10s)
+    const POLL_INTERVAL_MS = 10000;
+    let sentinelInterval: ReturnType<typeof setInterval> | null = null;
+
+    const checkZ1Token = async () => {
       try {
         // Petición ultra-liviana meta-fetch exclusivamente del token puro de la celda Z1 al endpoint doGet de Apps Script
         const currentToken = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
@@ -314,11 +316,50 @@ export default function App() {
       } catch (err) {
         console.warn("⚠️ [Centinela Z1] Error en chequeo de token Z1:", err);
       }
-    }, POLL_INTERVAL_MS);
+    };
 
-    // Limpieza de intervalo al desmontar el componente
+    const startSentinel = () => {
+      if (!sentinelInterval) {
+        // Ejecución inmediata al volver a la pestaña
+        checkZ1Token();
+        sentinelInterval = setInterval(checkZ1Token, POLL_INTERVAL_MS);
+      }
+    };
+
+    const stopSentinel = () => {
+      if (sentinelInterval) {
+        clearInterval(sentinelInterval);
+        sentinelInterval = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.hidden) {
+        // Usuario cambió de pestaña, minimizó o bloqueó la pantalla: consumo de red = 0
+        console.log("⏸️ [Centinela Z1] Pestaña oculta (document.hidden = true). Centinela detenido, consumo de red en 0.");
+        stopSentinel();
+      } else {
+        // Usuario regresó a la pestaña: reactivación inmediata y revisión en caliente
+        console.log("▶️ [Centinela Z1] Pestaña visible (document.hidden = false). Centinela reactivado, verificando cambios...");
+        startSentinel();
+      }
+    };
+
+    // Iniciar centinela si la pestaña está visible al inicio
+    if (typeof document !== "undefined" && !document.hidden) {
+      startSentinel();
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+
+    // Limpieza de intervalo y detector de eventos al desmontar el componente
     return () => {
-      clearInterval(sentinelInterval);
+      stopSentinel();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
   }, []);
 
