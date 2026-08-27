@@ -709,8 +709,8 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
         isLiveConnection={isLiveFromGoogle}
       />
 
-      {/* Main Content Dashboard */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      {/* Main Content Dashboard - Full Width Layout */}
+      <main className="flex-1 w-full max-w-none px-4 md:px-8 py-6 sm:py-8 space-y-6">
         {/* Permission Required Alert Banner (Solo visible para Administradores si la hoja estuviese restringida) */}
         {isAdmin && needsPermissionNotice && (
           <div className="bg-[#FAF5E6] border-2 border-[#EBDDBF] rounded-2xl p-4 sm:p-5 shadow-xs animate-fadeIn">
@@ -919,7 +919,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
 
       {/* Footer */}
       <footer className="border-t border-[#D9DED4] bg-[#F9F9F7] py-6 text-center text-xs text-[#6B7366]">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="w-full max-w-none px-4 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p>© {new Date().getFullYear()} Status Apex Soporte • Apex America</p>
           <div className="flex items-center gap-4 text-[#6B7366]">
             <span>Google Sheets Live Database</span>
