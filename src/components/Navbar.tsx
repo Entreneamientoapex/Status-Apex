@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-[#F9F9F7]/95 backdrop-blur border-b border-[#D9DED4] text-[#2D332A] shadow-xs">
-      <div className="w-full max-w-none px-4 md:px-8">
+      <div className="w-full max-w-[1850px] mx-auto px-6">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
           {/* Brand, Logo & Admin Toggle Button */}
           <div className="flex items-center gap-3 min-w-0">
