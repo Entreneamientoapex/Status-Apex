@@ -123,13 +123,22 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           {selectedJCC && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#EAEFF8] text-[#2B579A] border border-[#C5D7F0] font-semibold">
               <Briefcase className="h-3.5 w-3.5" />
-              <span>JCC: {selectedJCC}</span>
+              <span>
+                {selectedJCC.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                  ? "CC&T: "
+                  : "JCC: "}
+                {selectedJCC}
+              </span>
               {onClearJCC && (
                 <button
                   type="button"
                   onClick={onClearJCC}
                   className="hover:bg-[#D8E4F5] p-0.5 rounded cursor-pointer transition-colors"
-                  title="Quitar filtro de JCC"
+                  title={
+                    selectedJCC.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                      ? "Quitar filtro de CC&T"
+                      : "Quitar filtro de JCC"
+                  }
                 >
                   <X className="h-3 w-3" />
                 </button>

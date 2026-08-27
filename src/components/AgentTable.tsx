@@ -692,12 +692,21 @@ export const AgentTable: React.FC<AgentTableProps> = ({
             {selectedJCC && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F5F0FF] text-[#5B21B6] border border-[#DDD6FE] font-semibold">
                 <Users className="h-3.5 w-3.5 text-[#5B21B6]" />
-                <span>JCC: {selectedJCC}</span>
+                <span>
+                  {selectedJCC.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                    ? "CC&T: "
+                    : "JCC: "}
+                  {selectedJCC}
+                </span>
                 {onClearJCC && (
                   <button
                     onClick={onClearJCC}
                     className="p-0.5 hover:bg-[#EDE9FE] rounded-full text-[#5B21B6] cursor-pointer"
-                    title="Quitar filtro de JCC"
+                    title={
+                      selectedJCC.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
+                        ? "Quitar filtro de CC&T"
+                        : "Quitar filtro de JCC"
+                    }
                   >
                     <X className="h-3 w-3" />
                   </button>
