@@ -57,7 +57,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      {/* COLUMNA 1 (Izquierda): Desempeño de Trainers (Pestañas de Google Sheets) */}
+      {/* COLUMNA 1 (Izquierda): Cursos Pendientes (Pestañas de Google Sheets) */}
       <AnalysisHistoryCard
         history={history}
         activeAnalysisId={activeAnalysisId}

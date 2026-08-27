@@ -56,7 +56,7 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-bold text-[#2D332A] flex items-center gap-1.5">
-                <span>Desempeño de Trainers</span>
+                <span>Cursos Pendientes</span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F3EE] text-[#6B7366] border border-[#D9DED4]">
                   {history.length} {history.length === 1 ? "test" : "tests / hojas"}
                 </span>
