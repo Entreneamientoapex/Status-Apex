@@ -708,7 +708,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
   const activeAnalysisObj = history.find((h) => h.id === activeAnalysisId);
 
   return (
-    <div className="min-h-screen bg-[#F9F9F7] text-[#2D332A] flex flex-col font-sans selection:bg-[#8DA189] selection:text-white">
+    <div className="min-h-screen bg-gradient-to-bl from-[#0ea5e9]/20 via-[#f59e0b]/15 via-[#f8fafc] to-[#ffffff] text-[#1e293b] flex flex-col font-sans selection:bg-[#0ea5e9] selection:text-white">
       {/* Toast Notification */}
       {toast && (
         <div
@@ -959,10 +959,10 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#D9DED4] bg-[#F9F9F7] py-6 text-center text-xs text-[#6B7366]">
+      <footer className="border-t border-white/20 bg-white/90 backdrop-blur py-6 text-center text-xs text-slate-600 shadow-md mt-auto">
         <div className="w-full max-w-[1550px] mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p>© {new Date().getFullYear()} Status Apex Soporte • Apex America</p>
-          <div className="flex items-center gap-4 text-[#6B7366]">
+          <div className="flex items-center gap-4 text-slate-500 font-medium">
             <span>Google Sheets Live Database</span>
             <span>•</span>
             <span>Acceso {isAdmin ? "Administrador (Trainer)" : "Lector Público"}</span>

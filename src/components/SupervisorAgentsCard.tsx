@@ -52,7 +52,10 @@ export const SupervisorAgentsCard: React.FC<SupervisorAgentsCardProps> = ({
   }, [filteredAgents]);
 
   return (
-    <div className="bg-white border border-[#D9DED4] rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs h-full min-h-[360px]">
+    <div
+      style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+      className="rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-full min-h-[360px]"
+    >
       <div className="flex flex-col h-full">
         {/* Header del Cuadro de la Derecha: Título "Agentes" */}
         <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-[#E8EAE3]">
@@ -61,12 +64,12 @@ export const SupervisorAgentsCard: React.FC<SupervisorAgentsCardProps> = ({
               <Users className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-bold text-[#2D332A] truncate">
+              <h2 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">
                 Agentes
               </h2>
               {selectedSupervisor && (
-                <p className="text-[10px] text-[#6B7366] truncate">
-                  Supervisor: <span className="font-semibold text-[#2D332A]">{selectedSupervisor}</span>
+                <p className="text-[10px] font-medium text-slate-600 truncate">
+                  Supervisor: <span className="font-semibold text-slate-800">{selectedSupervisor}</span>
                 </p>
               )}
             </div>

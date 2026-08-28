@@ -546,7 +546,10 @@ export const AgentTable: React.FC<AgentTableProps> = ({
   return (
     <div id="agent-table-section" className="space-y-6">
       {/* Control Bar: Tabs, Active Filters & Search */}
-      <div className="bg-white border border-[#D9DED4] rounded-2xl shadow-xs p-4 space-y-4">
+      <div
+        style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+        className="rounded-2xl p-4 space-y-4"
+      >
         {/* Status & View Mode Filter Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F1F3EE] rounded-xl border border-[#D9DED4] text-xs">
@@ -783,7 +786,10 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         /* ========================================================================= */
         /* VIEW MODE 1: SUPERVISOR ACCORDION GROUPS */
         /* ========================================================================= */
-        <div className="bg-white border border-[#D9DED4] rounded-2xl shadow-xs p-4 space-y-3">
+        <div
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className="rounded-2xl p-4 space-y-3"
+        >
           {supervisorGroups.length === 0 ? (
             <div className="p-12 text-center text-[#6B7366]">
               <Users className="h-8 w-8 text-[#8DA189] mx-auto mb-2" />
@@ -860,8 +866,8 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                 {agent.agentName.substring(0, 2).toUpperCase()}
                               </div>
                               <div>
-                                <span className="font-medium text-xs text-[#2D332A]">{agent.agentName}</span>
-                                <div className="flex items-center gap-2 text-[10px] text-[#6B7366]">
+                                <span className="font-medium text-xs text-slate-800">{agent.agentName}</span>
+                                <div className="flex items-center gap-2 text-[10px] font-medium text-slate-600">
                                   {agent.agentId && <span className="font-mono">{agent.agentId}</span>}
                                   <span>•</span>
                                   <span>{agent.trainingName}</span>
@@ -916,7 +922,8 @@ export const AgentTable: React.FC<AgentTableProps> = ({
             return (
               <div
                 key={testItem.id || testIdx}
-                className="bg-white border border-[#D9DED4] rounded-2xl shadow-xs overflow-hidden transition-all"
+                style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+                className="rounded-2xl overflow-hidden transition-all"
               >
                 {/* SUB-TABLE HEADER BANNER */}
                 <div className="p-4 bg-[#F9F9F7] border-b border-[#E8EAE3] flex flex-wrap items-center justify-between gap-3">
@@ -1092,7 +1099,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <div
                                         onClick={() => onSelectAgent(agent)}
-                                        className="font-medium text-[#2D332A] hover:text-[#4F7A4F] cursor-pointer transition-colors"
+                                        className="font-medium text-slate-800 hover:text-[#4F7A4F] cursor-pointer transition-colors"
                                       >
                                         {agent.agentName}
                                       </div>
@@ -1106,9 +1113,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#6B7366]">
+                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] font-medium text-slate-600">
                                       {agent.agentId && (
-                                        <span className="font-mono bg-[#F1F3EE] px-1.5 py-0.5 rounded text-[#2D332A]">
+                                        <span className="font-mono bg-[#F1F3EE] px-1.5 py-0.5 rounded text-slate-700">
                                           {agent.agentId}
                                         </span>
                                       )}

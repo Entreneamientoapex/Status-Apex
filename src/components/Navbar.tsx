@@ -2,7 +2,6 @@ import React from "react";
 import {
   Download,
   Brain,
-  GraduationCap,
   Sparkles,
   RefreshCw,
   FileSpreadsheet,
@@ -13,6 +12,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { GOOGLE_SHEET_URL } from "../utils/googleSheetsConfig";
+import { ApexMonogram } from "./ApexMonogram";
 
 interface NavbarProps {
   onOpenAIReport: () => void;
@@ -53,19 +53,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   const approvalRate = rawApprovalRate % 1 === 0 ? rawApprovalRate.toString() : rawApprovalRate.toFixed(1);
 
   return (
-    <header className="sticky top-0 z-30 bg-[#F9F9F7]/95 backdrop-blur border-b border-[#D9DED4] text-[#2D332A] shadow-xs">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-white/20 text-[#1e293b] shadow-md">
       <div className="w-full max-w-[1550px] mx-auto px-5">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
-          {/* Brand, Logo & Admin Toggle Button */}
+          {/* Brand & Admin Toggle Button */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[#8DA189] flex items-center justify-center shadow-sm text-white shrink-0">
-              <GraduationCap className="h-6 w-6" />
-            </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-[#2D332A] truncate">
-                  Status Apex Soporte
-                </h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ApexMonogram className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 shrink-0" />
+                  <h1 className="text-sm sm:text-lg lg:text-xl font-sans font-extrabold tracking-tight bg-gradient-to-r from-[#f97316] via-[#84cc16]/70 to-[#06b6d4] bg-clip-text text-transparent truncate">
+                    Status Apex Soporte
+                  </h1>
+                </div>
 
                 {/* BOTÓN EN EL NAVBAR: Ingresar Modo Admin / Indicador Admin */}
                 <button

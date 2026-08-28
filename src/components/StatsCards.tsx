@@ -103,8 +103,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
     <div className="space-y-2 mb-6">
       {/* Active Filter Indicators (JCC, Supervisor & Multi-Test) */}
       {(selectedJCC || selectedSupervisor || selectedTestCount > 1) && (
-        <div className="flex items-center gap-2 flex-wrap text-xs animate-fadeIn">
-          <span className="text-[11px] font-semibold text-[#6B7366]">Filtros activos en métricas:</span>
+        <div className="flex items-center gap-2 flex-wrap text-xs animate-fadeIn bg-white/95 backdrop-blur-sm p-2 rounded-xl border border-white/40 shadow-sm">
+          <span className="text-[11px] font-semibold text-slate-600">Filtros activos en métricas:</span>
           
           {selectedTestCount > 1 && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1] font-semibold">
@@ -174,10 +174,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         <div
           id="card-total-agents"
           onClick={() => handleCardClick("ALL")}
-          className={`group bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md ${
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className={`group rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer ${
             activeFilter === "ALL"
-              ? "border-[#8DA189] ring-2 ring-[#8DA189]/20 bg-[#FBFDFB]"
-              : "border-[#D9DED4] hover:border-[#8DA189]"
+              ? "ring-2 ring-[#8DA189]/40"
+              : "hover:scale-[1.01]"
           }`}
           title="Clic para ver la lista completa de asesores filtrados"
         >
@@ -223,10 +224,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         <div
           id="card-approved-agents"
           onClick={() => handleCardClick("Aprobado")}
-          className={`group bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md ${
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className={`group rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer ${
             activeFilter === "Aprobado"
-              ? "border-[#4F7A4F] ring-2 ring-[#4F7A4F]/20 bg-[#F4F9F4]"
-              : "border-[#C6DEC6] hover:border-[#4F7A4F] hover:bg-[#FAFDF9]"
+              ? "ring-2 ring-[#4F7A4F]/40"
+              : "hover:scale-[1.01]"
           }`}
           title="Clic para abrir el modal con el listado de agentes Aprobados (≥80 pts)"
         >
@@ -266,10 +268,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         <div
           id="card-failed-agents"
           onClick={() => handleCardClick("No Aprobado")}
-          className={`group bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md ${
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className={`group rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer ${
             activeFilter === "No Aprobado"
-              ? "border-[#9E4A4A] ring-2 ring-[#9E4A4A]/20 bg-[#FDF7F7]"
-              : "border-[#F0D5D5] hover:border-[#9E4A4A] hover:bg-[#FDF9F9]"
+              ? "ring-2 ring-[#9E4A4A]/40"
+              : "hover:scale-[1.01]"
           }`}
           title="Clic para abrir el modal con el listado de agentes No Aprobados (<80 pts)"
         >
@@ -307,10 +310,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         <div
           id="card-pending-agents"
           onClick={() => handleCardClick("Pendiente")}
-          className={`group bg-white border rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md ${
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className={`group rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer ${
             activeFilter === "Pendiente"
-              ? "border-[#8C733E] ring-2 ring-[#8C733E]/20 bg-[#FDFBF7]"
-              : "border-[#EBDDBF] hover:border-[#8C733E] hover:bg-[#FDFCF9]"
+              ? "ring-2 ring-[#8C733E]/40"
+              : "hover:scale-[1.01]"
           }`}
           title="Clic para abrir el modal con el listado de agentes Pendientes de evaluación"
         >
@@ -346,7 +350,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         {/* 5. Porcentaje de Éxito (Efectividad real: Aprobados / Total de Evaluados * 100) */}
         <div
           id="card-success-rate"
-          className="bg-white border border-[#D9DED4] rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs"
+          style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+          className="rounded-2xl p-4 sm:p-5 transition-all duration-200"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-[#2D332A] flex items-center gap-1.5">

@@ -46,7 +46,10 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
   const someSelected = selectedTestIds.length > 0;
 
   return (
-    <div className="bg-white border border-[#D9DED4] rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs h-full">
+    <div
+      style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
+      className="rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-full"
+    >
       <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
@@ -55,9 +58,9 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
               <History className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-xs sm:text-sm font-bold text-[#2D332A] flex items-center gap-1.5">
+              <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
                 <span>Cursos Pendientes</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F3EE] text-[#6B7366] border border-[#D9DED4]">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F3EE] text-slate-600 border border-[#D9DED4]">
                   {history.length} {history.length === 1 ? "test" : "tests / hojas"}
                 </span>
               </h3>
@@ -79,7 +82,7 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
 
         {/* Subheader with Multi-Select Controls */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
-          <p className="text-[11px] text-[#6B7366] leading-tight flex-1">
+          <p className="text-[11px] font-medium text-slate-600 leading-tight flex-1">
             {someSelected
               ? `Consolidando ${selectedTestIds.length} de ${history.length} evaluaciones:`
               : "Marca casilleros para consolidar tests o haz clic en uno:"}
