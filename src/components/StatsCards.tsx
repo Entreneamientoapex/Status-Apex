@@ -152,7 +152,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           {selectedSupervisor && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF] font-semibold">
               <UserCheck className="h-3.5 w-3.5" />
-              <span>Supervisor: {selectedSupervisor}</span>
+              <span>Supervisor: {selectedSupervisor.toLowerCase() === "staff" ? "Supervisor" : selectedSupervisor}</span>
               {onClearSupervisor && (
                 <button
                   type="button"
@@ -182,24 +182,27 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           }`}
           title="Clic para ver la lista completa de asesores filtrados"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#2D332A] flex items-center gap-1.5">
-              <span>Total Agentes</span>
-              {selectedSupervisor ? (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]">
-                  Por Supervisor
-                </span>
-              ) : selectedTestCount > 1 ? (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1]">
-                  {selectedTestCount} Tests
-                </span>
-              ) : (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#F1F3EE] text-[#4F7A4F] border border-[#C6DEC6]">
-                  En Vivo
-                </span>
-              )}
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-[#F1F3EE] group-hover:bg-[#E8EDE5] text-[#2D332A] flex items-center justify-center border border-[#D9DED4] transition-colors">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#0083a4] font-semibold text-xs uppercase tracking-wider font-['Montserrat']">Nómina General</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <h3 className="text-[#334155] font-black text-sm font-['Montserrat']">Total Agentes</h3>
+                {selectedSupervisor ? (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]">
+                    Por Supervisor
+                  </span>
+                ) : selectedTestCount > 1 ? (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1]">
+                    {selectedTestCount} Tests
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#F1F3EE] text-[#4F7A4F] border border-[#C6DEC6]">
+                    En Vivo
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="h-8 w-8 rounded-xl bg-[#F1F3EE] group-hover:bg-[#E8EDE5] text-[#2D332A] flex items-center justify-center border border-[#D9DED4] transition-colors shrink-0">
               <Users className="h-4 w-4" />
             </div>
           </div>
@@ -212,7 +215,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           <div className="mt-1.5 flex items-center justify-between text-[11px] text-[#6B7366]">
             <span className="flex items-center gap-1 truncate">
               <Filter className="h-3 w-3 text-[#8DA189] shrink-0" />
-              <span>{selectedSupervisor ? selectedSupervisor : "Nómina filtrada"}</span>
+              <span>{selectedSupervisor ? (selectedSupervisor.toLowerCase() === "staff" ? "Supervisor" : selectedSupervisor) : "Nómina filtrada"}</span>
             </span>
             <span className="text-[10px] font-medium text-[#8DA189] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
               Ver <ExternalLink className="h-2.5 w-2.5" />
@@ -232,14 +235,12 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           }`}
           title="Clic para abrir el modal con el listado de agentes Aprobados (≥80 pts)"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#4F7A4F] flex items-center gap-1.5">
-              <span>Aprobados</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#E6F3E6] text-[#4F7A4F] border border-[#C6DEC6]">
-                ≥80 pts
-              </span>
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-[#E6F3E6] group-hover:bg-[#DCEDDC] text-[#4F7A4F] flex items-center justify-center border border-[#C6DEC6] transition-colors">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#0083a4] font-semibold text-xs uppercase tracking-wider font-['Montserrat']">Calificaciones</p>
+              <h3 className="text-[#334155] font-black text-sm mt-0.5 font-['Montserrat']">Aprobados &ge; 80 pts</h3>
+            </div>
+            <div className="h-8 w-8 rounded-xl bg-[#E6F3E6] group-hover:bg-[#DCEDDC] text-[#4F7A4F] flex items-center justify-center border border-[#C6DEC6] transition-colors shrink-0">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
@@ -256,11 +257,22 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               Ver lista <ExternalLink className="h-2.5 w-2.5" />
             </span>
           </div>
-          <div className="mt-2.5 w-full bg-[#E8EAE3] rounded-full h-1.5 overflow-hidden">
+          <div className="mt-3 w-full bg-[#9cdbe9] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
             <div
-              className="bg-[#4F7A4F] h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, approvedPct)}%` }}
-            ></div>
+              className="bg-[#0083a4] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              style={{ width: `${Math.min(100, Math.max(approvedPct > 0 ? 18 : 0, approvedPct))}%` }}
+            >
+              {approvedPct > 0 && (
+                <span className="text-white font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                  {formatPct(approvedPct)}
+                </span>
+              )}
+            </div>
+            {approvedPct === 0 && (
+              <span className="absolute left-4 text-[#0083a4] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                0%
+              </span>
+            )}
           </div>
         </div>
 
@@ -276,14 +288,12 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           }`}
           title="Clic para abrir el modal con el listado de agentes No Aprobados (<80 pts)"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#9E4A4A] flex items-center gap-1.5">
-              <span>No Aprobados</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#FDF1F1] text-[#9E4A4A] border border-[#F0D5D5]">
-                &lt;80 pts
-              </span>
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-[#FDF1F1] group-hover:bg-[#FAE8E8] text-[#9E4A4A] flex items-center justify-center border border-[#F0D5D5] transition-colors">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#0083a4] font-semibold text-xs uppercase tracking-wider font-['Montserrat']">Calificaciones</p>
+              <h3 className="text-[#334155] font-black text-sm mt-0.5 font-['Montserrat']">No Aprobados &lt; 80 pts</h3>
+            </div>
+            <div className="h-8 w-8 rounded-xl bg-[#FDF1F1] group-hover:bg-[#FAE8E8] text-[#9E4A4A] flex items-center justify-center border border-[#F0D5D5] transition-colors shrink-0">
               <XCircle className="h-4 w-4" />
             </div>
           </div>
@@ -299,6 +309,23 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
             <span className="text-[10px] font-bold text-[#9E4A4A] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 bg-[#FDF1F1] px-1.5 py-0.5 rounded border border-[#F0D5D5]">
               Ver lista <ExternalLink className="h-2.5 w-2.5" />
             </span>
+          </div>
+          <div className="mt-3 w-full bg-[#fdba74]/70 rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
+            <div
+              className="bg-[#ea580c] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              style={{ width: `${Math.min(100, Math.max(failedPct > 0 ? 18 : 0, failedPct))}%` }}
+            >
+              {failedPct > 0 && (
+                <span className="text-white font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                  {formatPct(failedPct)}
+                </span>
+              )}
+            </div>
+            {failedPct === 0 && (
+              <span className="absolute left-4 text-[#ea580c] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                0%
+              </span>
+            )}
           </div>
           <div className="mt-2 flex items-center gap-1 text-[11px] text-[#8C733E]">
             <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -318,14 +345,12 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           }`}
           title="Clic para abrir el modal con el listado de agentes Pendientes de evaluación"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#8C733E] flex items-center gap-1.5">
-              <span>Pendientes</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]">
-                Sin Nota
-              </span>
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-[#FAF5E6] group-hover:bg-[#F5EDD5] text-[#8C733E] flex items-center justify-center border border-[#EBDDBF] transition-colors">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#0083a4] font-semibold text-xs uppercase tracking-wider font-['Montserrat']">Evaluaciones</p>
+              <h3 className="text-[#334155] font-black text-sm mt-0.5 font-['Montserrat']">Pendientes Sin Nota</h3>
+            </div>
+            <div className="h-8 w-8 rounded-xl bg-[#FAF5E6] group-hover:bg-[#F5EDD5] text-[#8C733E] flex items-center justify-center border border-[#EBDDBF] transition-colors shrink-0">
               <Clock className="h-4 w-4" />
             </div>
           </div>
@@ -342,6 +367,23 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               Ver lista <ExternalLink className="h-2.5 w-2.5" />
             </span>
           </div>
+          <div className="mt-3 w-full bg-[#fef08a] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
+            <div
+              className="bg-[#d97706] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              style={{ width: `${Math.min(100, Math.max(pendingPct > 0 ? 18 : 0, pendingPct))}%` }}
+            >
+              {pendingPct > 0 && (
+                <span className="text-white font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                  {formatPct(pendingPct)}
+                </span>
+              )}
+            </div>
+            {pendingPct === 0 && (
+              <span className="absolute left-4 text-[#d97706] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                0%
+              </span>
+            )}
+          </div>
           <p className="mt-2 text-[11px] text-[#6B7366] truncate">
             {pending > 0 ? `${pending} sin evaluación en planilla` : "Todos evaluados"}
           </p>
@@ -353,11 +395,12 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           style={{ boxShadow: '0 25px 60px rgba(0, 0, 0, 0.22)', border: 'none', background: '#ffffff' }}
           className="rounded-2xl p-4 sm:p-5 transition-all duration-200"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#2D332A] flex items-center gap-1.5">
-              <span>Porcentaje de Éxito</span>
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-[#E6F3E6] text-[#4F7A4F] flex items-center justify-center border border-[#C6DEC6]">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[#0083a4] font-semibold text-xs uppercase tracking-wider font-['Montserrat']">Métricas Globales</p>
+              <h3 className="text-[#334155] font-black text-sm mt-0.5 font-['Montserrat']">Porcentaje de Éxito</h3>
+            </div>
+            <div className="h-8 w-8 rounded-xl bg-[#E6F3E6] text-[#4F7A4F] flex items-center justify-center border border-[#C6DEC6] shrink-0">
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
@@ -377,17 +420,22 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               ({approved}/{totalEvaluated > 0 ? totalEvaluated : total} {totalEvaluated > 0 ? "evaluados" : "total"})
             </span>
           </div>
-          <div className="mt-2.5 w-full bg-[#E8EAE3] rounded-full h-1.5 overflow-hidden">
+          <div className="mt-3 w-full bg-[#9cdbe9] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
             <div
-              className={`h-1.5 rounded-full transition-all duration-500 ${
-                successRate >= 80
-                  ? "bg-[#4F7A4F]"
-                  : successRate >= 60
-                  ? "bg-[#8DA189]"
-                  : "bg-[#9E4A4A]"
-              }`}
-              style={{ width: `${Math.min(100, successRate)}%` }}
-            ></div>
+              className="bg-[#0083a4] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              style={{ width: `${Math.min(100, Math.max(successRate > 0 ? 18 : 0, successRate))}%` }}
+            >
+              {successRate > 0 && (
+                <span className="text-white font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                  {successRate}%
+                </span>
+              )}
+            </div>
+            {successRate === 0 && (
+              <span className="absolute left-4 text-[#0083a4] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+                0%
+              </span>
+            )}
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[#6B7366]">
             <span className="truncate">{totalEvaluated > 0 ? "(Aprobados / Evaluados)" : "Efectividad"}</span>

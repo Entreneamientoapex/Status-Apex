@@ -212,9 +212,14 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
   const filteredSupervisors = useMemo(() => {
     if (!searchTerm.trim()) return supervisorStats;
     const query = searchTerm.toLowerCase().trim();
-    return supervisorStats.filter((item) =>
-      item.supervisor.toLowerCase().includes(query)
-    );
+    return supervisorStats.filter((item) => {
+      const isStaff = item.supervisor.toLowerCase() === "staff";
+      const displayName = isStaff ? "Supervisor" : item.supervisor;
+      return (
+        item.supervisor.toLowerCase().includes(query) ||
+        displayName.toLowerCase().includes(query)
+      );
+    });
   }, [supervisorStats, searchTerm]);
 
   const handleSupervisorClick = (supName: string) => {
@@ -227,6 +232,11 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
   };
 
   const isMultiTest = activeEvaluations.length > 1;
+
+  // Lógica condicional del badge de cabecera: Grupo de Staff vs Coordinadores
+  const isOnlyStaff =
+    supervisorStats.length > 0 &&
+    supervisorStats.every((s) => s.supervisor.toLowerCase() === "staff");
 
   return (
     <div
@@ -259,7 +269,9 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
               </button>
             ) : (
               <span className="text-[10px] text-[#6B7366] font-medium px-2 py-0.5 rounded-full bg-[#F1F3EE] border border-[#D9DED4]">
-                {supervisorStats.length} {supervisorStats.length === 1 ? "Coordinador" : "Coordinadores"}
+                {isOnlyStaff
+                  ? `${supervisorStats.length} Grupo de Staff`
+                  : `${supervisorStats.length} ${supervisorStats.length === 1 ? "Coordinador" : "Coordinadores"}`}
               </span>
             )}
           </div>
@@ -292,6 +304,8 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
         <div className="space-y-2 overflow-y-auto max-h-[250px] pr-1 divide-y divide-[#F1F3EE]">
           {filteredSupervisors.map((item, idx) => {
             const isSelected = selectedSupervisor === item.supervisor;
+            const isStaff = item.supervisor.toLowerCase() === "staff";
+            const displayName = isStaff ? "Supervisor" : item.supervisor;
 
             return (
               <div
@@ -305,7 +319,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                     ? "bg-[#EAF5EC] border-[#A8D5B0] shadow-2xs ring-1 ring-[#1E7E34]/30"
                     : "bg-[#F9FAF8] hover:bg-[#F1F3EE] border-transparent hover:border-[#D9DED4]"
                 }`}
-                title={isSelected ? `Filtro activo: ${item.supervisor} (Clic para desmarcar)` : `Filtrar por supervisor: ${item.supervisor}`}
+                title={isSelected ? `Filtro activo: ${displayName} (Clic para desmarcar)` : `Filtrar por supervisor: ${displayName}`}
               >
                 <div className="truncate pr-2 min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -319,7 +333,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                         isSelected ? "text-[#1E7E34]" : "text-[#2D332A] group-hover:text-[#1E7E34]"
                       }`}
                     >
-                      {item.supervisor}
+                      {displayName}
                     </p>
                   </div>
                   <p className="text-[10px] text-[#6B7366] flex items-center gap-1.5 mt-0.5">
