@@ -162,7 +162,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
               <Briefcase className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
+              <h2 className="font-['Montserrat'] font-sans font-extrabold text-[#334155] text-base tracking-tight">
                 JCC/CC&T
               </h2>
             </div>
@@ -251,17 +251,17 @@ export const JCCCard: React.FC<JCCCardProps> = ({
                         </div>
                       )}
                       <p
-                        className={`text-xs font-semibold truncate transition-colors ${
+                        className={`font-sans font-bold text-sm tracking-normal truncate transition-colors ${
                           isSelected
                             ? "text-[#2B579A]"
-                            : "text-[#2D332A] group-hover:text-[#2B579A]"
+                            : "text-slate-900 group-hover:text-[#2B579A]"
                         }`}
                       >
                         {item.jcc}
                       </p>
                     </div>
-                    <p className="text-[10px] text-[#6B7366] flex items-center gap-1.5 mt-0.5">
-                      <span className="font-medium">
+                    <p className="font-sans font-medium text-slate-500 text-xs mt-1 flex items-center gap-1.5">
+                      <span>
                         {item.total} {item.total === 1 ? "asesor asignado" : "asesores asignados"}
                       </span>
                       <span>•</span>

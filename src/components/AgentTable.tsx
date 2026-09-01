@@ -866,9 +866,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                 {agent.agentName.substring(0, 2).toUpperCase()}
                               </div>
                               <div>
-                                <span className="font-medium text-xs text-slate-800">{agent.agentName}</span>
-                                <div className="flex items-center gap-2 text-[10px] font-medium text-slate-600">
-                                  {agent.agentId && <span className="font-mono">{agent.agentId}</span>}
+                                <span className="font-sans font-bold text-slate-900 text-sm tracking-normal">{agent.agentName}</span>
+                                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 font-sans mt-1">
+                                  {agent.agentId && <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{agent.agentId}</span>}
                                   <span>•</span>
                                   <span>{agent.trainingName}</span>
                                 </div>
@@ -877,12 +877,12 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                             <div className="flex items-center gap-3">
                               <div className="text-right text-xs">
-                                <span className="font-bold text-[#2D332A]">
+                                <span className="font-extrabold text-slate-800">
                                   {agent.score !== null ? `${agent.score}/80` : "Sin nota"}
                                 </span>
                               </div>
                               <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
                                   isApproved
                                     ? "bg-[#E6F3E6] text-[#2D6A4F]"
                                     : isFailed
@@ -934,7 +934,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm sm:text-base text-[#2D332A] bg-white px-3 py-1 rounded-lg border border-[#D9DED4] shadow-2xs">
+                        <span className="font-['Montserrat'] font-sans font-extrabold text-sm sm:text-base text-slate-800 bg-white px-3 py-1 rounded-lg border border-[#D9DED4] shadow-2xs">
                           📋 Cuestionario Activo: {testName}
                         </span>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#E8EAE3] text-[#2D332A] border border-[#D9DED4] shadow-2xs">
@@ -945,15 +945,15 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                           </span>
                         </span>
                         {testItem.createdAtFormatted && (
-                          <span className="text-[11px] text-[#6B7366] font-mono">
+                          <span className="text-xs text-slate-500 font-mono">
                             ({testItem.createdAtFormatted})
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-[#6B7366] mt-1 flex-wrap">
-                        <span>Tema: <strong className="text-[#2D332A]">{testItem.trainingTopic || testName}</strong></span>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap font-sans">
+                        <span>Tema: <strong className="font-bold text-slate-800">{testItem.trainingTopic || testName}</strong></span>
                         <span>•</span>
-                        <span>Trainer: <strong className="text-[#2D332A]">{trainerName}</strong></span>
+                        <span>Trainer: <strong className="font-bold text-slate-800">{trainerName}</strong></span>
                       </div>
                     </div>
                   </div>
@@ -992,8 +992,8 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                 {/* PHYSICAL SUB-TABLE FOR THIS TEST */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-[#F9F9F7] text-[#6B7366] font-semibold border-b border-[#E8EAE3]">
+                  <table className="w-full text-left text-xs sm:text-sm font-sans">
+                    <thead className="bg-[#F9F9F7] text-slate-500 font-semibold border-b border-[#E8EAE3]">
                       <tr>
                         <th className="p-3.5 sm:p-4 w-10">
                           <input
@@ -1008,48 +1008,48 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                         </th>
                         <th
                           onClick={() => handleSort("agentName")}
-                          className="p-3.5 sm:p-4 cursor-pointer hover:text-[#2D332A] transition-colors"
+                          className="p-3.5 sm:p-4 cursor-pointer hover:text-slate-900 transition-colors"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
                             <span>Agente & Identificación</span>
                             <ArrowUpDown className="h-3.5 w-3.5 opacity-60 text-[#8DA189]" />
                           </div>
                         </th>
-                        <th className="p-3.5 sm:p-4">Supervisor & Campaña</th>
-                        <th className="p-3.5 sm:p-4">Capacitación / Trainer</th>
+                        <th className="p-3.5 sm:p-4 font-bold text-slate-700">Supervisor & Campaña</th>
+                        <th className="p-3.5 sm:p-4 font-bold text-slate-700">Capacitación / Trainer</th>
                         <th
                           onClick={() => handleSort("completionDate")}
-                          className="p-3.5 sm:p-4 cursor-pointer hover:text-[#2D332A] transition-colors"
+                          className="p-3.5 sm:p-4 cursor-pointer hover:text-slate-900 transition-colors"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
                             <span>Fecha</span>
                             <ArrowUpDown className="h-3.5 w-3.5 opacity-60 text-[#8DA189]" />
                           </div>
                         </th>
                         <th
                           onClick={() => handleSort("score")}
-                          className="p-3.5 sm:p-4 cursor-pointer hover:text-[#2D332A] transition-colors"
+                          className="p-3.5 sm:p-4 cursor-pointer hover:text-slate-900 transition-colors"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
                             <span>Calificación</span>
                             <ArrowUpDown className="h-3.5 w-3.5 opacity-60 text-[#8DA189]" />
                           </div>
                         </th>
-                        <th className="p-3.5 sm:p-4 text-center">Asistencia</th>
+                        <th className="p-3.5 sm:p-4 text-center font-bold text-slate-700">Asistencia</th>
                         <th
                           onClick={() => handleSort("status")}
-                          className="p-3.5 sm:p-4 cursor-pointer hover:text-[#2D332A] transition-colors"
+                          className="p-3.5 sm:p-4 cursor-pointer hover:text-slate-900 transition-colors"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
                             <span>Estado Aprobación</span>
                             <ArrowUpDown className="h-3.5 w-3.5 opacity-60 text-[#8DA189]" />
                           </div>
                         </th>
-                        <th className="p-3.5 sm:p-4 text-right">Acciones</th>
+                        <th className="p-3.5 sm:p-4 text-right font-bold text-slate-700">Acciones</th>
                       </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-[#F1F3EE] text-[#2D332A]">
+                    <tbody className="divide-y divide-[#F1F3EE] text-slate-700">
                       {agents.length === 0 ? (
                         <tr>
                           <td colSpan={9} className="p-10 text-center text-[#6B7366]">
@@ -1099,7 +1099,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <div
                                         onClick={() => onSelectAgent(agent)}
-                                        className="font-medium text-slate-800 hover:text-[#4F7A4F] cursor-pointer transition-colors"
+                                        className="font-sans font-bold text-slate-900 hover:text-[#0083a4] cursor-pointer transition-colors text-sm tracking-normal"
                                       >
                                         {agent.agentName}
                                       </div>
@@ -1113,9 +1113,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] font-medium text-slate-600">
+                                    <div className="flex items-center gap-2 mt-1 text-xs font-medium text-slate-500 font-sans">
                                       {agent.agentId && (
-                                        <span className="font-mono bg-[#F1F3EE] px-1.5 py-0.5 rounded text-slate-700">
+                                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
                                           {agent.agentId}
                                         </span>
                                       )}
@@ -1126,7 +1126,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                               {/* Supervisor & Campaña / JCC */}
                               <td className="p-3.5 sm:p-4">
-                                <div className="font-medium text-[#2D332A] flex items-center gap-1.5">
+                                <div className="font-sans font-medium text-slate-800 text-sm tracking-normal flex items-center gap-1.5">
                                   <UserCheck className="h-3.5 w-3.5 text-[#8DA189]" />
                                   <span
                                     className="truncate max-w-[170px]"
@@ -1141,7 +1141,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     }
                                   >
                                     Líder:{" "}
-                                    <strong className="font-bold text-[#2D332A]">
+                                    <strong className="font-bold text-slate-900">
                                       {agent.supervisor &&
                                       agent.supervisor !== "-" &&
                                       agent.supervisor.toLowerCase() !== "sin supervisor asignado" &&
@@ -1152,13 +1152,13 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     </strong>
                                   </span>
                                 </div>
-                                <div className="text-[11px] text-[#6B7366] mt-0.5 truncate max-w-[170px] flex items-center gap-1 flex-wrap">
+                                <div className="text-xs text-slate-500 mt-1 truncate max-w-[170px] flex items-center gap-1 flex-wrap font-sans">
                                   <span>{agent.campaign || "General"}</span>
                                   {agent.jcc && agent.jcc !== "-" && (
                                     <>
                                       <span>•</span>
                                       <span
-                                        className="text-[#2B579A] font-medium"
+                                        className="text-[#0083a4] font-medium"
                                         title={`${
                                           agent.jcc.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "diaz, matias gabriel"
                                             ? "CC&T"
@@ -1177,17 +1177,17 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                               {/* Training & Trainer */}
                               <td className="p-3.5 sm:p-4">
-                                <div className="font-medium text-[#2D332A] line-clamp-1 max-w-[220px]" title={agent.trainingName || testName}>
+                                <div className="font-sans font-medium text-slate-800 text-sm tracking-normal line-clamp-1 max-w-[220px]" title={agent.trainingName || testName}>
                                   {agent.trainingName || testName}
                                 </div>
-                                <div className="text-[11px] text-[#6B7366] flex items-center gap-1 mt-0.5">
-                                  <span className="text-[#8DA189]">Trainer:</span>
-                                  <span className="truncate max-w-[160px]">{agent.trainerName || trainerName}</span>
+                                <div className="text-xs text-slate-500 flex items-center gap-1 mt-1 font-sans">
+                                  <span className="text-slate-400">Trainer:</span>
+                                  <span className="truncate max-w-[160px] font-medium text-slate-600">{agent.trainerName || trainerName}</span>
                                 </div>
                               </td>
 
                               {/* Date */}
-                              <td className="p-3.5 sm:p-4 text-xs font-mono text-[#6B7366] whitespace-nowrap">
+                              <td className="p-3.5 sm:p-4 text-xs font-mono text-slate-600 whitespace-nowrap">
                                 {agent.completionDate || testItem.createdAtFormatted || "N/D"}
                               </td>
 
@@ -1197,7 +1197,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                   <div>
                                     <div className="flex items-center gap-1.5">
                                       <span
-                                        className={`font-semibold text-sm sm:text-base font-mono ${
+                                        className={`font-extrabold text-sm sm:text-base font-mono ${
                                           agent.score >= (agent.minPassingScore || 80)
                                             ? "text-[#4F7A4F]"
                                             : "text-[#9E4A4A]"
@@ -1205,27 +1205,27 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                       >
                                         {agent.score}
                                       </span>
-                                      <span className="text-[11px] text-[#6B7366]">
+                                      <span className="text-xs text-slate-500 font-bold">
                                         /{agent.minPassingScore || 80}
                                       </span>
                                     </div>
                                     {agent.passedInRetake && (
-                                      <div className="text-[10px] text-[#3D704D] font-medium bg-[#EBF5EE] px-1 py-0.5 rounded border border-[#BDE0C7] mt-0.5 inline-block">
+                                      <div className="text-[10px] text-[#3D704D] font-bold bg-[#EBF5EE] px-1 py-0.5 rounded border border-[#BDE0C7] mt-0.5 inline-block">
                                         Recup: {agent.retakeScore} pts
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-[#8DA189] italic text-xs">Sin nota</span>
+                                  <span className="text-slate-400 italic text-xs">Sin nota</span>
                                 )}
                               </td>
 
                               {/* Attendance */}
                               <td className="p-3.5 sm:p-4 text-center">
                                 <span
-                                  className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${
                                     (agent.attendancePercentage || 100) >= 80
-                                      ? "bg-[#F1F3EE] text-[#2D332A]"
+                                      ? "bg-[#F1F3EE] text-slate-800"
                                       : "bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]"
                                   }`}
                                 >

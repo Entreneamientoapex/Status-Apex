@@ -57,13 +57,13 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
             <div className="h-7 w-7 rounded-lg bg-[#E6F3E6] border border-[#C6DEC6] flex items-center justify-center text-[#4F7A4F]">
               <History className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
-                <span>Cursos Pendientes</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F3EE] text-slate-600 border border-[#D9DED4]">
-                  {history.length} {history.length === 1 ? "test" : "tests / hojas"}
-                </span>
+            <div className="flex items-center gap-2">
+              <h3 className="font-['Montserrat'] font-sans font-extrabold text-[#334155] text-base tracking-tight">
+                Cursos Pendientes
               </h3>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F3EE] text-slate-600 border border-[#D9DED4]">
+                {history.length} {history.length === 1 ? "test" : "tests / hojas"}
+              </span>
             </div>
           </div>
 
@@ -160,8 +160,8 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
-                        className={`text-xs font-bold transition-colors truncate ${
-                          isActive ? "text-[#244624]" : isChecked ? "text-[#1E4D1E]" : "text-[#2D332A] group-hover:text-[#4F7A4F]"
+                        className={`font-sans font-bold text-sm tracking-normal transition-colors truncate ${
+                          isActive ? "text-[#244624]" : isChecked ? "text-[#1E4D1E]" : "text-slate-900 group-hover:text-[#4F7A4F]"
                         }`}
                       >
                         {item.name}
@@ -206,19 +206,19 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                     </div>
 
                     {/* Date and Time extracted or fetched */}
-                    <div className="flex items-center gap-1 text-[10px] text-[#6B7366] mt-0.5">
-                      <Clock className="h-3 w-3 text-[#8DA189]" />
-                      <span className="font-mono">{item.createdAtFormatted}</span>
+                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5 font-sans">
+                      <Clock className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="font-mono text-slate-600">{item.createdAtFormatted}</span>
                     </div>
 
                     {/* Metric Badges & Admin Status Switch */}
-                    <div className="flex items-center gap-2 text-[10px] text-[#2D332A] mt-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-[#D9DED4] font-medium">
-                        <Users className="h-3 w-3 text-[#6B7366]" />
+                    <div className="flex items-center gap-2 text-xs text-slate-700 mt-1.5 flex-wrap font-sans">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-[#D9DED4] font-bold text-slate-800">
+                        <Users className="h-3 w-3 text-slate-500" />
                         {item.totalAgents} agentes
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold border ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold border ${
                           item.passRate >= 80
                             ? "bg-[#E6F3E6] text-[#4F7A4F] border-[#C6DEC6]"
                             : "bg-[#FAF5E6] text-[#8C733E] border-[#EBDDBF]"

@@ -251,7 +251,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
               <UserCheck className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
+              <h2 className="font-['Montserrat'] font-sans font-extrabold text-[#334155] text-base tracking-tight">
                 Supervisor
               </h2>
             </div>
@@ -329,15 +329,15 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                       </div>
                     )}
                     <p
-                      className={`text-xs font-semibold truncate transition-colors ${
-                        isSelected ? "text-[#1E7E34]" : "text-[#2D332A] group-hover:text-[#1E7E34]"
+                      className={`font-sans font-bold text-sm tracking-normal truncate transition-colors ${
+                        isSelected ? "text-[#1E7E34]" : "text-slate-900 group-hover:text-[#1E7E34]"
                       }`}
                     >
                       {displayName}
                     </p>
                   </div>
-                  <p className="text-[10px] text-[#6B7366] flex items-center gap-1.5 mt-0.5">
-                    <span className="font-medium">
+                  <p className="font-sans font-medium text-slate-500 text-xs mt-1 flex items-center gap-1.5">
+                    <span>
                       {item.total} {item.total === 1 ? "asesor" : "asesores"}
                     </span>
                     <span>•</span>
