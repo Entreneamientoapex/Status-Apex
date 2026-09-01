@@ -110,10 +110,10 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#1E241B]">
-                Enviar Solicitud de Matriculación
+              <h2 className="font-['Montserrat'] font-sans font-extrabold text-[#334155] text-lg tracking-tight">
+                Enviar Solicitud de <span className="text-[#0083a4]">Matriculación</span>
               </h2>
-              <p className="text-xs text-[#6B7366]">
+              <p className="font-medium text-slate-400 text-xs mt-0.5">
                 Crea una alerta directa para el Administrador del sistema
               </p>
             </div>

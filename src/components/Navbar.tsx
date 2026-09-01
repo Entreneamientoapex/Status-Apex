@@ -106,17 +106,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Actions & Live Stats */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
             {/* Quick Approval Pill (Visible para todos los usuarios) */}
-            <div className="flex items-center gap-3 px-3 py-1.5 bg-white border border-[#D9DED4] rounded-xl text-xs shadow-2xs">
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-full text-xs shadow-xs font-['Montserrat']">
               <div>
-                <span className="text-[#6B7366]">Total:</span>{" "}
-                <span className="font-semibold text-[#2D332A]">{totalAgents}</span>
+                <span className="text-slate-500 font-medium">Total:</span>{" "}
+                <span className="font-bold text-slate-800">{totalAgents}</span>
               </div>
-              <div className="h-3.5 w-px bg-[#D9DED4]"></div>
+              <div className="h-3.5 w-px bg-slate-300"></div>
               <div>
-                <span className="text-[#6B7366]">Aprobados:</span>{" "}
-                <span className="font-semibold text-[#4F7A4F]">
+                <span className="text-slate-500 font-medium">Aprobados:</span>{" "}
+                <span className="font-bold text-[#0083a4]">
                   {approvedCount} ({approvalRate}%)
                 </span>
               </div>
@@ -129,10 +129,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="btn-guest-solicitud-matriculacion"
                   onClick={onOpenGuestMatriculacion}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95"
+                  className="rounded-full bg-[#0083a4] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#006b85] transition-colors border-none shadow-sm cursor-pointer active:scale-95"
                   title="Enviar una nueva solicitud de matriculación para revisión"
                 >
-                  <UserPlus className="h-3.5 w-3.5 text-[#4F7A4F]" />
+                  <UserPlus className="h-4 w-4 text-white shrink-0" />
                   <span className="hidden sm:inline">Enviar Solicitud de Matriculación</span>
                   <span className="sm:hidden">Matriculación</span>
                 </button>
@@ -141,10 +141,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="btn-guest-enviar-feedback"
                   onClick={onOpenGuestFeedback}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#1D4ED8] border border-[#BFDBFE] transition-all shadow-2xs cursor-pointer active:scale-95"
+                  className="rounded-full bg-[#ea580c] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#c2410c] transition-colors border-none shadow-sm cursor-pointer active:scale-95"
                   title="Enviar una nueva devolución o feedback de auditoría"
                 >
-                  <MessageSquare className="h-3.5 w-3.5 text-[#2563EB]" />
+                  <MessageSquare className="h-4 w-4 text-white shrink-0" />
                   <span className="hidden sm:inline">Enviar Feedback de Auditoría</span>
                   <span className="sm:hidden">Feedback</span>
                 </button>
