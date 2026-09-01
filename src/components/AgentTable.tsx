@@ -124,6 +124,12 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Limpiar búsqueda en tabla y selecciones al cambiar de curso activo o evaluaciones
+  React.useEffect(() => {
+    setFilters((prev) => ({ ...prev, searchQuery: "" }));
+    setSelectedIds([]);
+  }, [activeAnalysisId, selectedTestIds]);
+
   // 1. Determine active test sheets / campaigns to display
   const activeTests = useMemo<SheetAnalysisRecord[]>(() => {
     if (history && history.length > 0) {

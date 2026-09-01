@@ -99,6 +99,11 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Limpiar texto de búsqueda al cambiar de curso o evaluaciones
+  React.useEffect(() => {
+    setSearchTerm("");
+  }, [activeAnalysisId, selectedTestIds]);
+
   // Determine active evaluations selected in history
   const activeEvaluations = useMemo(() => {
     if (selectedTestIds.length === 0) return [];

@@ -363,11 +363,16 @@ export default function App() {
     };
   }, []);
 
-  // Switch Active Analysis / Tab
+  // Switch Active Analysis / Tab (ACTION_SELECT_TEST)
   const handleSelectAnalysis = (analysis: SheetAnalysisRecord) => {
     setActiveAnalysisId(analysis.id);
     setRecords(analysis.records);
     setSelectedTestIds([]);
+
+    // Reset de estados y filtros previos al cambiar de curso activo
+    setSelectedJCC(null);
+    setSelectedSupervisor(null);
+    setStatusFilter("ALL");
 
     setCurrentBatch({
       id: analysis.id,
@@ -385,6 +390,12 @@ export default function App() {
 
     showToast(`Pestaña "${analysis.name}" cargada en el dashboard.`, "success");
   };
+
+  // Limpieza y reseteo garantizado de filtros JCC y Supervisor ante cualquier cambio de curso activo
+  useEffect(() => {
+    setSelectedJCC(null);
+    setSelectedSupervisor(null);
+  }, [activeAnalysisId]);
 
   // Derive records based on active test selection (single tab or multi-test checkboxes)
   const currentTestRecords = useMemo(() => {
