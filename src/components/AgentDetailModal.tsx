@@ -270,26 +270,13 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-[#F9F9F7] border-t border-[#E8EAE3] flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#F9F9F7] border-t border-[#E8EAE3] flex items-center justify-start">
           <button
             onClick={onClose}
             className="px-4 py-2 text-xs sm:text-sm font-medium text-[#6B7366] hover:text-[#2D332A] rounded-xl hover:bg-[#E8EAE3] transition-colors cursor-pointer"
           >
             Cerrar
           </button>
-
-          {isApproved && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenCertificate(agent);
-              }}
-              className="flex items-center gap-2 px-5 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-[#8DA189] hover:bg-[#7D9179] text-white shadow-xs transition-all cursor-pointer"
-            >
-              <Award className="h-4 w-4" />
-              <span>Ver Certificado de Aprobación</span>
-            </button>
-          )}
         </div>
       </div>
     </div>

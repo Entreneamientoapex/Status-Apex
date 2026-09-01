@@ -793,26 +793,29 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
 
         {/* Banner Notice: Centralized Google Sheet Database Connection (Visible ÚNICAMENTE para Administradores) */}
         {isAdmin && (
-          <div className="bg-white border border-[#D9DED4] rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs animate-fadeIn">
+          <div
+            className="bg-gradient-to-r from-[#d97706] via-[#334155] via-[#0d9488] to-[#0ea5e9] rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-white/10 animate-fadeIn"
+            style={{ boxShadow: "0 25px 60px rgba(0, 0, 0, 0.22)" }}
+          >
             <div className="flex items-start gap-3.5">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-[#EAF5EC] border border-[#CCE8D1] text-[#1E7E34] flex items-center justify-center shrink-0">
-                <FileSpreadsheet className="h-6 w-6" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-white/20 backdrop-blur-xs border border-white/30 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <FileSpreadsheet className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-semibold text-[#2D332A] flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-sans font-extrabold text-white flex items-center gap-2">
                   <span>Base de Datos Centralizada en Google Sheets</span>
                   <span
                     className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border hidden sm:inline-flex items-center gap-1 ${
                       isLiveFromGoogle
-                        ? "bg-[#EAF5EC] text-[#1E7E34] border-[#CCE8D1]"
-                        : "bg-[#FAF5E6] text-[#8C733E] border-[#EBDDBF]"
+                        ? "bg-white/20 text-white border-white/30"
+                        : "bg-amber-400/20 text-amber-200 border-amber-300/30"
                     }`}
                   >
                     <Sparkles className="h-3 w-3" />
                     {isLiveFromGoogle ? "Conectado en Vivo" : "Sincronizando..."}
                   </span>
                 </h2>
-                <p className="text-xs sm:text-sm text-[#6B7366] mt-0.5 max-w-2xl">
+                <p className="text-xs sm:text-sm text-white/80 font-sans font-medium mt-0.5 max-w-2xl">
                   Los datos se consultan automáticamente desde tu Google Sheet público. Cada pestaña representa un test independiente. Editá o agregá pestañas directamente en Google Sheets para actualizar el dashboard.
                 </p>
               </div>
