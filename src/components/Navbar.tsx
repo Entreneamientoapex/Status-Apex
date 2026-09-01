@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <ApexMonogram className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 shrink-0" />
                   <h1 className="text-sm sm:text-lg lg:text-xl font-sans font-extrabold tracking-tight bg-gradient-to-r from-[#f97316] via-[#84cc16]/70 to-[#06b6d4] bg-clip-text text-transparent truncate">
-                    Status Apex Soporte
+                    Training Soporte
                   </h1>
                 </div>
 
