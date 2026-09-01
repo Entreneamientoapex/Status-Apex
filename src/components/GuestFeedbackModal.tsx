@@ -106,10 +106,10 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
               <MessageSquare className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#1E241B]">
-                Enviar Feedback de Auditoría
+              <h2 className="font-sans font-extrabold text-slate-800 text-lg tracking-tight">
+                Enviar Feedback de <span className="text-[#0083a4]">Auditoría</span>
               </h2>
-              <p className="text-xs text-[#6B7366]">
+              <p className="font-medium text-slate-400 text-xs mt-0.5">
                 Carga una devolución con captura adjunta para el panel Admin
               </p>
             </div>

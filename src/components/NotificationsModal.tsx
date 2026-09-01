@@ -272,7 +272,9 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-[#1E241B]">Bandeja de Notificaciones</h2>
+                <h2 className="font-sans font-extrabold text-slate-800 text-lg tracking-tight">
+                  Bandeja de <span className="text-[#0083a4]">Notificaciones</span>
+                </h2>
                 {unreadCount > 0 ? (
                   <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-[#EBF3E8] text-[#2D5A27] border border-[#C5DAC5]">
                     {unreadCount} no leída{unreadCount > 1 ? "s" : ""}
@@ -362,13 +364,23 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                         </span>
                         <span className="text-[10px] text-[#8C9487]"> • {item.timestamp}</span>
                       </div>
-                      <h4
-                        className={`text-xs font-bold truncate mt-0.5 ${
-                          !item.isRead ? "text-[#1E241B]" : "text-[#4B5246]"
+                      <h3
+                        className={`font-sans font-extrabold text-sm tracking-tight truncate mt-0.5 ${
+                          !item.isRead ? "text-slate-800" : "text-slate-600"
                         }`}
                       >
-                        {item.title}
-                      </h4>
+                        {item.type === "matriculacion" ? (
+                          <>
+                            Nueva Solicitud de <span className="text-[#0083a4]">Matriculación</span>
+                          </>
+                        ) : item.type === "feedback" ? (
+                          <>
+                            Nuevo Feedback de <span className="text-[#0083a4]">Desempeño</span>
+                          </>
+                        ) : (
+                          item.title
+                        )}
+                      </h3>
                       <p className="text-[11px] text-[#6B7366] line-clamp-2 mt-1 leading-relaxed">
                         {item.shortDescription}
                       </p>
@@ -418,8 +430,18 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                       {activeNotification.timestamp}
                     </span>
                   </div>
-                  <h3 className="text-lg font-bold text-[#1E241B]">
-                    {activeNotification.title}
+                  <h3 className="font-sans font-extrabold text-slate-800 text-lg sm:text-xl tracking-tight">
+                    {activeNotification.type === "matriculacion" ? (
+                      <>
+                        Nueva Solicitud de <span className="text-[#0083a4]">Matriculación</span>
+                      </>
+                    ) : activeNotification.type === "feedback" ? (
+                      <>
+                        Nuevo Feedback de <span className="text-[#0083a4]">Desempeño</span>
+                      </>
+                    ) : (
+                      activeNotification.title
+                    )}
                   </h3>
                   <p className="text-xs text-[#6B7366] mt-1">
                     Origen: <span className="font-semibold text-[#2D332A]">{activeNotification.informacionDetallada.origen}</span>
