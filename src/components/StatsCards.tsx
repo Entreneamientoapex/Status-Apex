@@ -257,9 +257,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               Ver lista <ExternalLink className="h-2.5 w-2.5" />
             </span>
           </div>
-          <div className="mt-3 w-full bg-[#9cdbe9] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
+          <div className="mt-3 w-full bg-[#bbf7d0] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
             <div
-              className="bg-[#0083a4] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              className="bg-[#16a34a] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
               style={{ width: `${Math.min(100, Math.max(approvedPct > 0 ? 18 : 0, approvedPct))}%` }}
             >
               {approvedPct > 0 && (
@@ -269,7 +269,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               )}
             </div>
             {approvedPct === 0 && (
-              <span className="absolute left-4 text-[#0083a4] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+              <span className="absolute left-4 text-[#16a34a] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
                 0%
               </span>
             )}
@@ -310,9 +310,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               Ver lista <ExternalLink className="h-2.5 w-2.5" />
             </span>
           </div>
-          <div className="mt-3 w-full bg-[#fdba74]/70 rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
+          <div className="mt-3 w-full bg-[#fecaca] rounded-full h-10 sm:h-11 overflow-hidden relative flex items-center">
             <div
-              className="bg-[#ea580c] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
+              className="bg-[#dc2626] h-full rounded-full flex items-center pl-4 transition-all duration-500 min-w-0"
               style={{ width: `${Math.min(100, Math.max(failedPct > 0 ? 18 : 0, failedPct))}%` }}
             >
               {failedPct > 0 && (
@@ -322,7 +322,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
               )}
             </div>
             {failedPct === 0 && (
-              <span className="absolute left-4 text-[#ea580c] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
+              <span className="absolute left-4 text-[#dc2626] font-['Montserrat'] font-extrabold text-sm sm:text-base tracking-tight select-none">
                 0%
               </span>
             )}

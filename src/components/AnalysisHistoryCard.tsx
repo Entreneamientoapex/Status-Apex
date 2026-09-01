@@ -215,13 +215,21 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                     <div className="flex items-center gap-2 text-xs text-slate-700 mt-1.5 flex-wrap font-sans">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-[#D9DED4] font-bold text-slate-800">
                         <Users className="h-3 w-3 text-slate-500" />
-                        {item.totalAgents} agentes
+                        {item.totalAgents}{" "}
+                        {(item.name || "").toLowerCase().includes("(para supervisor)") ||
+                        (item.name || "").toLowerCase().includes("para supervisor") ||
+                        (item.sheetName || "").toLowerCase().includes("(para supervisor)") ||
+                        (item.trainingTopic || "").toLowerCase().includes("(para supervisor)")
+                          ? "staff"
+                          : "agentes"}
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold border ${
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-sans font-black uppercase text-[11px] shadow-sm text-white ${
                           item.passRate >= 80
-                            ? "bg-[#E6F3E6] text-[#4F7A4F] border-[#C6DEC6]"
-                            : "bg-[#FAF5E6] text-[#8C733E] border-[#EBDDBF]"
+                            ? "bg-[#16a34a]"
+                            : item.passRate >= 40
+                            ? "bg-[#d97706]"
+                            : "bg-[#dc2626]"
                         }`}
                       >
                         aprobados ({item.approvedCount})

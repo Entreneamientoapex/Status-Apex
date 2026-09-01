@@ -80,10 +80,20 @@ export function getDynamicTabAcronym(name: string | undefined | null, index: num
   return `T${index + 1}`;
 }
 
+interface SupervisorCardProps {
+  records: AgentRecord[];
+  history?: SheetAnalysisRecord[];
+  selectedTestIds?: string[];
+  activeAnalysisId?: string | null;
+  selectedSupervisor?: string | null;
+  onSelectSupervisor?: (supervisorName: string | null) => void;
+}
+
 export const SupervisorCard: React.FC<SupervisorCardProps> = ({
   records,
   history = [],
   selectedTestIds = [],
+  activeAnalysisId = null,
   selectedSupervisor = null,
   onSelectSupervisor,
 }) => {
@@ -94,6 +104,65 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
     if (selectedTestIds.length === 0) return [];
     return history.filter((h) => selectedTestIds.includes(h.id));
   }, [history, selectedTestIds]);
+
+  const hasSupervisorTestSelected = useMemo(() => {
+    const checkString = (str?: string) => {
+      if (!str) return false;
+      const lower = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return lower.includes("(para supervisor)") || lower.includes("para supervisor");
+    };
+
+    // ESCENARIO 1: Exámenes marcados con el casillero (checkbox)
+    if (selectedTestIds && selectedTestIds.length > 0) {
+      const selectedAnalyses = history.filter((h) => selectedTestIds.includes(h.id));
+      if (
+        selectedAnalyses.some(
+          (h) => checkString(h.name) || checkString(h.sheetName) || checkString(h.trainingTopic)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 2: Curso seleccionado actualmente como activo en pantalla (activeAnalysisId)
+    if (activeAnalysisId) {
+      const activeTest = history.find((h) => h.id === activeAnalysisId);
+      if (
+        activeTest &&
+        (checkString(activeTest.name) || checkString(activeTest.sheetName) || checkString(activeTest.trainingTopic))
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 3: Registros actuales cargados en pantalla
+    if (records && records.length > 0) {
+      if (
+        records.some(
+          (r) =>
+            checkString(r.trainingName) ||
+            checkString(r.testName) ||
+            checkString(r.examen) ||
+            checkString(r.sourceFileName)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 4: Evaluaciones marcadas como activas en el historial
+    if (activeEvaluations && activeEvaluations.length > 0) {
+      if (
+        activeEvaluations.some(
+          (h) => checkString(h.name) || checkString(h.sheetName) || checkString(h.trainingTopic)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [history, selectedTestIds, activeAnalysisId, records, activeEvaluations]);
 
   // Group agents by supervisor and calculate metrics
   const supervisorStats = useMemo(() => {
@@ -154,11 +223,19 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
 
     return Array.from(map.values())
       .map((data) => {
+        // Conteo limpio y sin duplicados de asesores finales por equipo
+        const uniqueAgents = new Set<string>();
+        data.agents.forEach((r) => {
+          const agentKey = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim() || "").toLowerCase();
+          if (agentKey) uniqueAgents.add(agentKey);
+        });
+        const teamTotal = uniqueAgents.size > 0 ? uniqueAgents.size : data.total;
+
         // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
         const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
         // Porcentaje de avance: asesores con nota real sobre el universo total de su equipo
         const porcentajeAvance =
-          data.total > 0 ? Math.round((rendidosActuales / data.total) * 100) : 0;
+          teamTotal > 0 ? Math.round((rendidosActuales / teamTotal) * 100) : 0;
 
         // Formulate multi-test badge dinámico: "TT: 85% | TD: 90%"
         let multiTestBadge = "";
@@ -185,7 +262,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
               // Asesores de su equipo que tienen nota numérica real en este test
               const testRendidos = supervisorTestAgents.filter(isAgentEvaluated).length;
               // Universo total de su equipo
-              const teamUniverse = data.total > 0 ? data.total : supervisorTestAgents.length;
+              const teamUniverse = teamTotal > 0 ? teamTotal : supervisorTestAgents.length;
               const testRate = teamUniverse > 0 ? Math.round((testRendidos / teamUniverse) * 100) : 0;
 
               return `${acronym}: ${testRate}%`;
@@ -196,7 +273,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
         return {
           supervisor: data.supervisor,
           agents: data.agents,
-          total: data.total,
+          total: teamTotal,
           approved: data.approved,
           failed: data.failed,
           pending: data.pending,
@@ -338,7 +415,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                   </div>
                   <p className="font-sans font-medium text-slate-500 text-xs mt-1 flex items-center gap-1.5">
                     <span>
-                      {item.total} {item.total === 1 ? "asesor" : "asesores"}
+                      {item.total} {hasSupervisorTestSelected ? "staff" : item.total === 1 ? "asesor" : "asesores"}
                     </span>
                     <span>•</span>
                     <span>Media: {item.avgScore > 0 ? `${item.avgScore} pts` : "Sin notas"}</span>
@@ -347,12 +424,12 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${
+                    className={`inline-block px-3 py-1 rounded-full text-[11px] font-sans font-black uppercase shadow-sm whitespace-nowrap text-white ${
                       item.porcentajeAvance >= 80
-                        ? "bg-[#E6F3E6] text-[#4F7A4F] border-[#C6DEC6]"
-                        : item.porcentajeAvance >= 60
-                        ? "bg-[#FAF5E6] text-[#8C733E] border-[#EBDDBF]"
-                        : "bg-[#FDF1F1] text-[#9E4A4A] border-[#F0D5D5]"
+                        ? "bg-[#16a34a]"
+                        : item.porcentajeAvance >= 40
+                        ? "bg-[#d97706]"
+                        : "bg-[#dc2626]"
                     }`}
                   >
                     {isMultiTest && item.multiTestBadge

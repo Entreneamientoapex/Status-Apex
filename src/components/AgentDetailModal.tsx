@@ -93,20 +93,20 @@ export const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
               <span className="text-xs font-semibold text-[#6B7366] block mb-1">Estado del Trainer:</span>
               <div className="flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-bold uppercase tracking-wider ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-sans font-black uppercase tracking-wider shadow-sm text-white ${
                     isApproved
-                      ? "bg-[#E6F3E6] text-[#4F7A4F] border border-[#C6DEC6]"
+                      ? "bg-[#16a34a]"
                       : isFailed
-                      ? "bg-[#FDF1F1] text-[#9E4A4A] border border-[#F0D5D5]"
-                      : "bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]"
+                      ? "bg-[#dc2626]"
+                      : "bg-[#d97706]"
                   }`}
                 >
                   {isApproved ? (
-                    <CheckCircle2 className="h-4 w-4 text-[#4F7A4F]" />
+                    <CheckCircle2 className="h-4 w-4 text-white" />
                   ) : isFailed ? (
-                    <XCircle className="h-4 w-4 text-[#9E4A4A]" />
+                    <XCircle className="h-4 w-4 text-white" />
                   ) : (
-                    <Clock className="h-4 w-4 text-[#8C733E]" />
+                    <Clock className="h-4 w-4 text-white" />
                   )}
                   <span>{agent.status}</span>
                 </span>

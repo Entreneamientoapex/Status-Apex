@@ -8,6 +8,7 @@ interface JCCCardProps {
   records: AgentRecord[];
   history?: SheetAnalysisRecord[];
   selectedTestIds?: string[];
+  activeAnalysisId?: string | null;
   selectedJCC?: string | null;
   onSelectJCC?: (jccName: string | null) => void;
 }
@@ -16,6 +17,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
   records,
   history = [],
   selectedTestIds = [],
+  activeAnalysisId = null,
   selectedJCC = null,
   onSelectJCC,
 }) => {
@@ -26,6 +28,85 @@ export const JCCCard: React.FC<JCCCardProps> = ({
     if (selectedTestIds.length === 0) return [];
     return history.filter((h) => selectedTestIds.includes(h.id));
   }, [history, selectedTestIds]);
+
+  // Determine if any selected/active test has "(para supervisor)" in its name
+  const hasSupervisorTestSelected = useMemo(() => {
+    const checkString = (str?: string) => {
+      if (!str) return false;
+      const lower = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return lower.includes("(para supervisor)") || lower.includes("para supervisor");
+    };
+
+    // ESCENARIO 1: Exámenes marcados con el casillero (checkbox)
+    if (selectedTestIds && selectedTestIds.length > 0) {
+      const selectedAnalyses = history.filter((h) => selectedTestIds.includes(h.id));
+      if (
+        selectedAnalyses.some(
+          (h) => checkString(h.name) || checkString(h.sheetName) || checkString(h.trainingTopic)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 2: Curso seleccionado actualmente como activo en pantalla (activeAnalysisId)
+    if (activeAnalysisId) {
+      const activeTest = history.find((h) => h.id === activeAnalysisId);
+      if (
+        activeTest &&
+        (checkString(activeTest.name) || checkString(activeTest.sheetName) || checkString(activeTest.trainingTopic))
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 3: Registros actuales cargados en pantalla
+    if (records && records.length > 0) {
+      if (
+        records.some(
+          (r) =>
+            checkString(r.trainingName) ||
+            checkString(r.testName) ||
+            checkString(r.examen) ||
+            checkString(r.sourceFileName)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // ESCENARIO 4: Evaluaciones marcadas como activas en el historial
+    if (activeEvaluations && activeEvaluations.length > 0) {
+      if (
+        activeEvaluations.some(
+          (h) => checkString(h.name) || checkString(h.sheetName) || checkString(h.trainingTopic)
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [history, selectedTestIds, activeAnalysisId, records, activeEvaluations]);
+
+  const getCardSubtitle = (jccName: string, supervisorCount: number, staffCount: number) => {
+    if (hasSupervisorTestSelected) {
+      return `${staffCount} staff seleccionado`;
+    }
+
+    const norm = (jccName || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const isMatiasDiaz = norm.includes("diaz") && (norm.includes("matias") || norm.includes("gabriel"));
+
+    if (isMatiasDiaz) {
+      return `${staffCount} staff asignados`;
+    }
+
+    return `${supervisorCount} ${supervisorCount === 1 ? "supervisor asignado" : "supervisores asignados"}`;
+  };
 
   // Group agents by JCC and calculate metrics
   const jccStats = useMemo(() => {
@@ -83,6 +164,28 @@ export const JCCCard: React.FC<JCCCardProps> = ({
 
     return Array.from(map.values())
       .map((data) => {
+        // Conteo único y sin duplicados de supervisores vinculados a este JCC
+        const uniqueSupervisors = new Set<string>();
+        const uniqueAgents = new Set<string>();
+
+        data.agents.forEach((r) => {
+          const agentKey = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim() || "").toLowerCase();
+          if (agentKey) uniqueAgents.add(agentKey);
+
+          const rawSup = r.supervisor?.trim();
+          if (
+            rawSup &&
+            rawSup !== "-" &&
+            !rawSup.toLowerCase().startsWith("sin supervisor") &&
+            !rawSup.toLowerCase().startsWith("sin asignar")
+          ) {
+            uniqueSupervisors.add(rawSup.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+          }
+        });
+
+        const supervisorCount = uniqueSupervisors.size;
+        const staffCount = uniqueAgents.size > 0 ? uniqueAgents.size : data.total;
+
         // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
         const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
         // Porcentaje de avance: asesores con nota real sobre el total de su universo
@@ -119,6 +222,8 @@ export const JCCCard: React.FC<JCCCardProps> = ({
           jcc: data.jcc,
           agents: data.agents,
           total: data.total,
+          supervisorCount,
+          staffCount,
           approved: data.approved,
           failed: data.failed,
           pending: data.pending,
@@ -262,7 +367,7 @@ export const JCCCard: React.FC<JCCCardProps> = ({
                     </div>
                     <p className="font-sans font-medium text-slate-500 text-xs mt-1 flex items-center gap-1.5">
                       <span>
-                        {item.total} {item.total === 1 ? "asesor asignado" : "asesores asignados"}
+                        {getCardSubtitle(item.jcc, item.supervisorCount, item.staffCount)}
                       </span>
                       <span>•</span>
                       <span>
@@ -273,12 +378,12 @@ export const JCCCard: React.FC<JCCCardProps> = ({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${
+                      className={`inline-block px-3 py-1 rounded-full text-[11px] font-sans font-black uppercase shadow-sm whitespace-nowrap text-white ${
                         item.porcentajeAvance >= 80
-                          ? "bg-[#E6F3E6] text-[#4F7A4F] border-[#C6DEC6]"
-                          : item.porcentajeAvance >= 60
-                          ? "bg-[#FAF5E6] text-[#8C733E] border-[#EBDDBF]"
-                          : "bg-[#FDF1F1] text-[#9E4A4A] border-[#F0D5D5]"
+                          ? "bg-[#16a34a]"
+                          : item.porcentajeAvance >= 40
+                          ? "bg-[#d97706]"
+                          : "bg-[#dc2626]"
                       }`}
                     >
                       {isMultiTest && item.multiTestBadge

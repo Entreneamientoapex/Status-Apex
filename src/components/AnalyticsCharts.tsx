@@ -77,6 +77,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
         records={records}
         history={history}
         selectedTestIds={selectedTestIds}
+        activeAnalysisId={activeAnalysisId}
         selectedJCC={selectedJCC}
         onSelectJCC={onSelectJCC}
       />
@@ -86,6 +87,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
         records={supervisorColumnRecords}
         history={history}
         selectedTestIds={selectedTestIds}
+        activeAnalysisId={activeAnalysisId}
         selectedSupervisor={selectedSupervisor}
         onSelectSupervisor={onSelectSupervisor}
       />

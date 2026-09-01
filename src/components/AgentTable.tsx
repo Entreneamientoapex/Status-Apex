@@ -551,70 +551,70 @@ export const AgentTable: React.FC<AgentTableProps> = ({
         className="rounded-2xl p-4 space-y-4"
       >
         {/* Status & View Mode Filter Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F1F3EE] rounded-xl border border-[#D9DED4] text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-0">
+          <div className="flex flex-wrap items-center gap-6 text-xs sm:text-sm font-['Montserrat']">
             {/* Todos */}
             <button
               onClick={() => handleTabChange("ALL")}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 -mb-[1px] font-['Montserrat'] uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "ALL"
-                  ? "bg-white text-[#2D332A] shadow-xs font-semibold"
-                  : "text-[#6B7366] hover:text-[#2D332A]"
+                  ? "text-[#f97316] font-bold sm:font-extrabold border-b-2 border-[#f97316]"
+                  : "text-slate-400 hover:text-slate-600 font-semibold border-b-2 border-transparent"
               }`}
             >
-              Todos ({overallTotals.totalAgents})
+              <span>Todos ({overallTotals.totalAgents})</span>
             </button>
 
             {/* Aprobados */}
             <button
               onClick={() => handleTabChange("Aprobado")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 -mb-[1px] font-['Montserrat'] uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "Aprobado"
-                  ? "bg-[#E6F3E6] text-[#4F7A4F] border border-[#C6DEC6] font-semibold shadow-xs"
-                  : "text-[#6B7366] hover:text-[#4F7A4F]"
+                  ? "text-[#f97316] font-bold sm:font-extrabold border-b-2 border-[#f97316]"
+                  : "text-slate-400 hover:text-slate-600 font-semibold border-b-2 border-transparent"
               }`}
             >
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#4F7A4F]" />
+              <CheckCircle2 className={`h-4 w-4 ${activeTab === "Aprobado" ? "text-[#f97316]" : "text-slate-400"}`} />
               <span>Aprobados ({overallTotals.totalApproved})</span>
             </button>
 
             {/* No Aprobados */}
             <button
               onClick={() => handleTabChange("No Aprobado")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 -mb-[1px] font-['Montserrat'] uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "No Aprobado"
-                  ? "bg-[#FDF1F1] text-[#9E4A4A] border border-[#F0D5D5] font-semibold shadow-xs"
-                  : "text-[#6B7366] hover:text-[#9E4A4A]"
+                  ? "text-[#f97316] font-bold sm:font-extrabold border-b-2 border-[#f97316]"
+                  : "text-slate-400 hover:text-slate-600 font-semibold border-b-2 border-transparent"
               }`}
             >
-              <XCircle className="h-3.5 w-3.5 text-[#9E4A4A]" />
+              <XCircle className={`h-4 w-4 ${activeTab === "No Aprobado" ? "text-[#f97316]" : "text-slate-400"}`} />
               <span>No Aprobados ({overallTotals.totalFailed})</span>
             </button>
 
             {/* Pendientes */}
             <button
               onClick={() => handleTabChange("Pendiente")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 -mb-[1px] font-['Montserrat'] uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "Pendiente"
-                  ? "bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF] font-semibold shadow-xs"
-                  : "text-[#6B7366] hover:text-[#8C733E]"
+                  ? "text-[#f97316] font-bold sm:font-extrabold border-b-2 border-[#f97316]"
+                  : "text-slate-400 hover:text-slate-600 font-semibold border-b-2 border-transparent"
               }`}
             >
-              <Clock className="h-3.5 w-3.5 text-[#8C733E]" />
+              <Clock className={`h-4 w-4 ${activeTab === "Pendiente" ? "text-[#f97316]" : "text-slate-400"}`} />
               <span>Pendientes ({overallTotals.totalPending})</span>
             </button>
 
             {/* Supervisores Tab */}
             <button
               onClick={() => handleTabChange("Supervisores")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 pb-2.5 -mb-[1px] font-['Montserrat'] uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === "Supervisores"
-                  ? "bg-[#2D332A] text-white shadow-xs font-semibold"
-                  : "text-[#2D332A] hover:bg-[#E8EAE3] font-medium"
+                  ? "text-[#f97316] font-bold sm:font-extrabold border-b-2 border-[#f97316]"
+                  : "text-slate-400 hover:text-slate-600 font-semibold border-b-2 border-transparent"
               }`}
               title="Ver datos agrupados por Supervisor / Team Leader"
             >
-              <Users className="h-3.5 w-3.5" />
+              <Users className={`h-4 w-4 ${activeTab === "Supervisores" ? "text-[#f97316]" : "text-slate-400"}`} />
               <span>Supervisores ({uniqueSupervisorsCount})</span>
             </button>
           </div>
@@ -882,12 +882,12 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                 </span>
                               </div>
                               <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-sans font-black uppercase shadow-sm text-white ${
                                   isApproved
-                                    ? "bg-[#E6F3E6] text-[#2D6A4F]"
+                                    ? "bg-[#16a34a]"
                                     : isFailed
-                                    ? "bg-[#FDF1F1] text-[#9E4A4A]"
-                                    : "bg-[#FAF5E6] text-[#8C733E]"
+                                    ? "bg-[#dc2626]"
+                                    : "bg-[#d97706]"
                                 }`}
                               >
                                 {agent.status}
@@ -1248,21 +1248,21 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                     return (
                                       <button
                                         onClick={() => onToggleStatus(agent.id, agent.status)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-2xs ${
+                                        className={`inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-sans font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm text-white ${
                                           isScoreApproved
-                                            ? "bg-[#E6F3E6] text-[#2D6A4F] border border-[#B7E4C7] hover:bg-[#D4EDDA]"
+                                            ? "bg-[#16a34a] hover:bg-[#15803d]"
                                             : isScoreFailed
-                                            ? "bg-[#FDF1F1] text-[#9E4A4A] border border-[#F0D5D5] hover:bg-[#F8D7DA]"
-                                            : "bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF] hover:bg-[#FFF3CD]"
+                                            ? "bg-[#dc2626] hover:bg-[#b91c1c]"
+                                            : "bg-[#d97706] hover:bg-[#b45309]"
                                         }`}
                                         title="Haz clic para cambiar estado de aprobación"
                                       >
                                         {isScoreApproved ? (
-                                          <CheckCircle2 className="h-3.5 w-3.5 text-[#2D6A4F]" />
+                                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
                                         ) : isScoreFailed ? (
-                                          <XCircle className="h-3.5 w-3.5 text-[#9E4A4A]" />
+                                          <XCircle className="h-3.5 w-3.5 text-white" />
                                         ) : (
-                                          <Clock className="h-3.5 w-3.5 text-[#8C733E]" />
+                                          <Clock className="h-3.5 w-3.5 text-white" />
                                         )}
                                         <span>
                                           {isScoreApproved
@@ -1277,20 +1277,20 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                                   return (
                                     <span
-                                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-2xs ${
+                                      className={`inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-sans font-black uppercase tracking-wider shadow-sm text-white ${
                                         isScoreApproved
-                                          ? "bg-[#E6F3E6] text-[#2D6A4F] border border-[#B7E4C7]"
+                                          ? "bg-[#16a34a]"
                                           : isScoreFailed
-                                          ? "bg-[#FDF1F1] text-[#9E4A4A] border border-[#F0D5D5]"
-                                          : "bg-[#FAF5E6] text-[#8C733E] border border-[#EBDDBF]"
+                                          ? "bg-[#dc2626]"
+                                          : "bg-[#d97706]"
                                       }`}
                                     >
                                       {isScoreApproved ? (
-                                        <CheckCircle2 className="h-3.5 w-3.5 text-[#2D6A4F]" />
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
                                       ) : isScoreFailed ? (
-                                        <XCircle className="h-3.5 w-3.5 text-[#9E4A4A]" />
+                                        <XCircle className="h-3.5 w-3.5 text-white" />
                                       ) : (
-                                        <Clock className="h-3.5 w-3.5 text-[#8C733E]" />
+                                        <Clock className="h-3.5 w-3.5 text-white" />
                                       )}
                                       <span>
                                         {isScoreApproved
