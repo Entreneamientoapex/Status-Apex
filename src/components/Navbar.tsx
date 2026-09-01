@@ -158,32 +158,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="btn-navbar-notificaciones"
                   onClick={onOpenNotifications}
-                  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                  className="rounded-full bg-[#0083a4] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#006b85] transition-colors border-none shadow-sm cursor-pointer active:scale-95 shrink-0"
                   title="Notificaciones"
                 >
-                  <span className="w-4 h-4 inline-block">🔔</span> Notificaciones
+                  <span className="text-base leading-none">🔔</span>
+                  <span>Notificaciones</span>
                 </button>
 
                 {/* Informe IA */}
                 <button
                   id="btn-open-ai-report"
                   onClick={onOpenAIReport}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold rounded-xl bg-[#E8EAE3] text-[#2D332A] hover:bg-[#D9DED4] border border-[#D9DED4] transition-colors shadow-2xs cursor-pointer"
+                  className="rounded-full bg-[#16a34a] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#115e59] transition-colors border-none shadow-sm cursor-pointer active:scale-95 shrink-0"
                   title="Ver análisis y recomendaciones de IA"
                 >
-                  <Brain className="h-3.5 w-3.5 text-[#4F7A4F]" />
-                  <span className="hidden sm:inline">Informe IA</span>
+                  <Brain className="h-4 w-4 text-white shrink-0" />
+                  <span>Informe IA</span>
                 </button>
 
                 {/* Exportar a Excel */}
                 <button
                   id="btn-export-excel"
                   onClick={onExportExcel}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold rounded-xl bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-colors shadow-2xs cursor-pointer"
+                  className="rounded-full bg-[#ea580c] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#c2410c] transition-colors border-none shadow-sm cursor-pointer active:scale-95 shrink-0"
                   title="Descargar copia en Excel (.xlsx)"
                 >
-                  <Download className="h-3.5 w-3.5 text-[#8DA189]" />
-                  <span className="hidden md:inline">Descargar Excel</span>
+                  <Download className="h-4 w-4 text-white shrink-0" />
+                  <span>Descargar Excel</span>
                 </button>
 
                 {/* Enlace directo para abrir la planilla de origen */}
@@ -193,10 +194,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     href={GOOGLE_SHEET_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-[#4F7A4F] hover:bg-[#3D633D] text-white shadow-2xs transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold rounded-full bg-[#334155] hover:bg-[#1e293b] text-white shadow-sm transition-all cursor-pointer shrink-0"
                     title="Abrir el Google Sheet de origen para editar notas o agregar pestañas"
                   >
-                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <FileSpreadsheet className="h-4 w-4 text-white" />
                     <span className="hidden sm:inline">Abrir Sheet</span>
                     <ExternalLink className="h-3 w-3 opacity-80" />
                   </a>

@@ -267,16 +267,30 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               )}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-[#2D332A]">
-                {view === "change_password"
-                  ? "Actualizar Contraseña en la Nube"
-                  : view === "hash_generated"
-                  ? "Asistente de Contraseña (SHA-256)"
-                  : isAdmin || view === "logged_in"
-                  ? "Panel de Administrador"
-                  : "Acceso Seguro de Trainer"}
+              <h2 className="font-['Montserrat'] font-sans font-extrabold text-[#334155] text-lg tracking-tight">
+                {view === "change_password" ? (
+                  <>
+                    Actualizar Contraseña en la{" "}
+                    <span className="text-[#0083a4]">Nube</span>
+                  </>
+                ) : view === "hash_generated" ? (
+                  <>
+                    Asistente de Contraseña{" "}
+                    <span className="text-[#0083a4]">(SHA-256)</span>
+                  </>
+                ) : isAdmin || view === "logged_in" ? (
+                  <>
+                    Panel de{" "}
+                    <span className="text-[#0083a4]">Administrador</span>
+                  </>
+                ) : (
+                  <>
+                    Acceso Seguro de{" "}
+                    <span className="text-[#0083a4]">Trainer</span>
+                  </>
+                )}
               </h2>
-              <p className="text-xs text-[#6B7366]">
+              <p className="font-medium text-slate-400 text-xs mt-0.5">
                 {view === "change_password"
                   ? "Sincronización directa y cifrado SHA-256 en Google Sheets"
                   : view === "hash_generated"
