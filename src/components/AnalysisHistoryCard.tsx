@@ -13,7 +13,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-import { SheetAnalysisRecord } from "../utils/googleSheetsService";
+import { SheetAnalysisRecord, formatTabTimestamp } from "../utils/googleSheetsService";
 
 interface AnalysisHistoryCardProps {
   history: SheetAnalysisRecord[];
@@ -206,9 +206,15 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                     </div>
 
                     {/* Date and Time extracted or fetched */}
-                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5 font-sans">
-                      <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      <span className="font-mono text-slate-600">{item.createdAtFormatted}</span>
+                    <div className="text-slate-400 text-xs font-sans flex items-center gap-1.5 mt-1">
+                      <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span>
+                        {item.lastUpdate && item.lastUpdate.trim() !== ""
+                          ? formatTabTimestamp(item.lastUpdate)
+                          : item.tabTimestamp || item.tabTimestampFormatted || item.createdAtFormatted
+                          ? formatTabTimestamp(item.tabTimestampFormatted || item.tabTimestamp || item.createdAtFormatted)
+                          : `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                      </span>
                     </div>
 
                     {/* Metric Badges & Admin Status Switch */}

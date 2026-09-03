@@ -25,6 +25,7 @@ import {
 import { AgentRecord, ApprovalStatus, FilterState } from "../types";
 import { UserRole } from "../utils/googleService";
 import { SheetAnalysisRecord } from "../utils/googleSheetsService";
+import { isBajaRecord } from "../utils/bajaFilter";
 
 interface AgentTableProps {
   records: AgentRecord[];
@@ -167,10 +168,14 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
   // 2. Strict Cross Filtering logic per test
   const filterAndSortTestRecords = (testItem: SheetAnalysisRecord) => {
-    const rawList = testItem.records && testItem.records.length > 0 ? testItem.records : records;
+    // FILTRADO ESTRICTO DE BAJAS: Omitir de forma absoluta a los asesores con baja o fondo rojo
+    const rawList = (testItem.records && testItem.records.length > 0 ? testItem.records : records)
+      .filter((r) => !isBajaRecord(r));
 
     return rawList
       .filter((r) => {
+        // Doble validación de seguridad de baja
+        if (isBajaRecord(r)) return false;
         // Strict Supervisor Cross-Filter (from selected supervisor filter)
         if (selectedSupervisor) {
           const supLower = selectedSupervisor.trim().toLowerCase();
@@ -285,7 +290,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
   // 3. Process records for all active tests
   const testSubTablesData = useMemo(() => {
     return activeTests.map((testItem) => {
-      const rawList = testItem.records && testItem.records.length > 0 ? testItem.records : records;
+      // FILTRADO ESTRICTO DE BAJAS: Omitir de forma absoluta a los asesores con baja o fondo rojo/rosado
+      const rawList = (testItem.records && testItem.records.length > 0 ? testItem.records : records)
+        .filter((r) => !isBajaRecord(r));
 
       // Base matching agents for this test under current Supervisor / JCC & Search criteria (before status tab)
       const baseSupervisorAgents = rawList.filter((r) => {
@@ -405,7 +412,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
       if (t.name) set.add(t.name);
       if (t.trainingTopic) set.add(t.trainingTopic);
       (t.records || []).forEach((r) => {
-        if (r.trainingName) set.add(r.trainingName);
+        if (!isBajaRecord(r) && r.trainingName) set.add(r.trainingName);
       });
     });
     return Array.from(set).filter(Boolean);
@@ -416,7 +423,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
     activeTests.forEach((t) => {
       if (t.trainer) set.add(t.trainer);
       (t.records || []).forEach((r) => {
-        if (r.trainerName) set.add(r.trainerName);
+        if (!isBajaRecord(r) && r.trainerName) set.add(r.trainerName);
       });
     });
     return Array.from(set).filter(Boolean);
@@ -426,7 +433,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
     const set = new Set<string>();
     activeTests.forEach((t) => {
       (t.records || []).forEach((r) => {
-        if (r.campaign) set.add(r.campaign);
+        if (!isBajaRecord(r) && r.campaign) set.add(r.campaign);
       });
     });
     return Array.from(set).filter(Boolean);

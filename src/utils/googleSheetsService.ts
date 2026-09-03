@@ -1,6 +1,7 @@
 import { AgentRecord, ApprovalStatus, ConfigUser } from "../types";
 import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL, DEFAULT_PASSING_SCORE, KNOWN_SHEET_TABS } from "./googleSheetsConfig";
 import { INITIAL_DEMO_RECORDS } from "./demoData";
+import { isBajaRecord } from "./bajaFilter";
 
 export interface SheetTabInfo {
   name: string;
@@ -24,6 +25,9 @@ export interface SheetAnalysisRecord {
   tabGid?: string | null;
   createdAt: string;
   createdAtFormatted: string;
+  lastUpdate?: string; // Marca de tiempo nativa provista desde Apps Script (lastUpdate)
+  tabTimestamp?: string; // Marca de tiempo individual provista desde Config_Usuarios / Apps Script
+  tabTimestampFormatted?: string; // Fecha y hora individual formateada (DD/MM/AAAA HH:MM)
   totalAgents: number; // Total FIJO de la base de datos maestra (261 asesores)
   approvedCount: number;
   failedCount: number;
@@ -65,12 +69,19 @@ export async function fetchSheetLastModifiedSignature(
   spreadsheetUrl: string = GOOGLE_SHEET_URL,
   appsScriptUrl: string = APPS_SCRIPT_URL
 ): Promise<string | null> {
-  // 1. PRIORIDAD: Consulta ultra-liviana a Apps Script con parámetros de escape de caché
+  // 1. PRIORIDAD: Consulta ultra-liviana a Apps Script con destructor de caché de red
   if (appsScriptUrl) {
     try {
       const sep = appsScriptUrl.includes("?") ? "&" : "?";
-      const checkUrl = `${appsScriptUrl}${sep}checkUpdate=true&nocache=${Date.now()}`;
-      const res = await fetch(checkUrl, { cache: "no-store", redirect: "follow" });
+      const checkUrl = `${appsScriptUrl}${sep}checkUpdate=true&cache=${Date.now()}`;
+      const res = await fetch(checkUrl, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+        redirect: "follow",
+      });
       if (res.ok) {
         const text = (await res.text()).trim();
         if (text && !text.includes("<!DOCTYPE html>") && !text.includes("accounts.google.com")) {
@@ -317,6 +328,99 @@ function extractDateFromTabName(tabName: string): { iso: string; formatted: stri
 }
 
 /**
+ * Formatea marcas de tiempo individuales a 'DD/MM/AAAA HH:MM' de forma dinámica e independiente.
+ * Lee timestamps en formato texto (DD/MM/AAAA HH:MM, ISO), números o Date objects.
+ * Si no registra una hora particular todavía, recurre al respaldo estable provisto.
+ */
+export function formatTabTimestamp(
+  rawDateOrTimestamp?: string | number | Date | null,
+  fallbackTimestamp?: string | number | Date | null
+): string {
+  const value = rawDateOrTimestamp !== undefined && rawDateOrTimestamp !== null && rawDateOrTimestamp !== ""
+    ? rawDateOrTimestamp
+    : fallbackTimestamp;
+
+  if (value === undefined || value === null || value === "") {
+    const now = new Date();
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  // 1. Si es instancia de Date
+  if (value instanceof Date) {
+    if (!isNaN(value.getTime())) {
+      const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+      return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    }
+  }
+
+  // 2. Si es timestamp numérico (milisegundos o segundos)
+  if (typeof value === "number") {
+    if (!isNaN(value) && value > 0) {
+      const ms = value < 10000000000 ? value * 1000 : value;
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) {
+        const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+    }
+  }
+
+  // 3. Si es cadena de texto
+  const str = String(value).trim();
+  if (!str) {
+    const now = new Date();
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  // Patrón DD/MM/AAAA HH:MM o DD/MM/YYYY HH:MM:SS
+  const ddmmyyyyTimeMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})[T\s]+(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (ddmmyyyyTimeMatch) {
+    let day = parseInt(ddmmyyyyTimeMatch[1], 10);
+    let month = parseInt(ddmmyyyyTimeMatch[2], 10);
+    let year = parseInt(ddmmyyyyTimeMatch[3], 10);
+    if (year < 100) year += 2000;
+    const hour = parseInt(ddmmyyyyTimeMatch[4], 10);
+    const min = parseInt(ddmmyyyyTimeMatch[5], 10);
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(day)}/${pad(month)}/${year} ${pad(hour)}:${pad(min)}`;
+  }
+
+  // Patrón ISO YYYY-MM-DDTHH:MM(:SS)
+  const isoTimeMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})[T\s]+(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (isoTimeMatch) {
+    const year = parseInt(isoTimeMatch[1], 10);
+    const month = parseInt(isoTimeMatch[2], 10);
+    const day = parseInt(isoTimeMatch[3], 10);
+    const hour = parseInt(isoTimeMatch[4], 10);
+    const min = parseInt(isoTimeMatch[5], 10);
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(day)}/${pad(month)}/${year} ${pad(hour)}:${pad(min)}`;
+  }
+
+  // Patrón solo fecha DD/MM/AAAA
+  const dateOnlyMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})$/);
+  if (dateOnlyMatch) {
+    let day = parseInt(dateOnlyMatch[1], 10);
+    let month = parseInt(dateOnlyMatch[2], 10);
+    let year = parseInt(dateOnlyMatch[3], 10);
+    if (year < 100) year += 2000;
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(day)}/${pad(month)}/${year} 10:00`;
+  }
+
+  // Intento de conversión estándar con Date.parse
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  }
+
+  return str;
+}
+
+/**
  * Parser robusto de CSV/TSV respetando comillas, comas, puntos y comas y tabulaciones
  */
 export function parseCsvRows(csvText: string): string[][] {
@@ -547,6 +651,9 @@ export async function fetchMasterAgentList(
     const row = dataRows[i];
     if (!row || row.every((c) => !c || c.trim() === "")) continue;
 
+    // FILTRADO ESTRICTO DE BAJAS: Omitir fila si viene marcada como baja o posee fondo rojo
+    if (isBajaRecord(row)) continue;
+
     const rawLegajo = colLegajo !== -1 ? row[colLegajo]?.trim() : "";
     const rawNombre = colNombre !== -1 ? row[colNombre]?.trim() : "";
     const rawSupervisor = colSupervisor !== -1 ? row[colSupervisor]?.trim() : "";
@@ -569,6 +676,18 @@ export async function fetchMasterAgentList(
 
     const jcc = rawJcc && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
     const campaign = rawCampaign && rawCampaign !== "-" ? rawCampaign : "Operaciones";
+
+    if (
+      isBajaRecord({
+        agentName: name,
+        agentId: legajo,
+        supervisor,
+        jcc,
+        campaign,
+      })
+    ) {
+      continue;
+    }
 
     masterAgents.push({
       legajo,
@@ -1349,14 +1468,16 @@ export async function fetchAndJoinTestAnalysis(
     };
   });
 
-  // 5. CÁLCULO DE MÉTRICAS DINÁMICAS POR EXAMEN SOBRE EL GRUPO FILTRADO:
-  const approvedCount = joinedRecords.filter((r) => r.status === "Aprobado").length;
-  const failedCount = joinedRecords.filter((r) => r.status === "No Aprobado").length;
-  const pendingCount = joinedRecords.filter(
+  // 5. CÁLCULO DE MÉTRICAS DINÁMICAS POR EXAMEN SOBRE EL GRUPO FILTRADO (SIN BAJAS):
+  const cleanJoinedRecords = joinedRecords.filter((r) => !isBajaRecord(r));
+
+  const approvedCount = cleanJoinedRecords.filter((r) => r.status === "Aprobado").length;
+  const failedCount = cleanJoinedRecords.filter((r) => r.status === "No Aprobado").length;
+  const pendingCount = cleanJoinedRecords.filter(
     (r) => r.status === "Pendiente" || (r.status !== "Aprobado" && r.status !== "No Aprobado")
   ).length;
 
-  const validScores = joinedRecords
+  const validScores = cleanJoinedRecords
     .filter((r) => r.status !== "Pendiente")
     .map((r) => r.score)
     .filter((s): s is number => typeof s === "number");
@@ -1370,8 +1491,8 @@ export async function fetchAndJoinTestAnalysis(
   const passRate =
     totalEvaluated > 0
       ? Math.round((approvedCount / totalEvaluated) * 100)
-      : joinedRecords.length > 0
-      ? Math.round((approvedCount / joinedRecords.length) * 100)
+      : cleanJoinedRecords.length > 0
+      ? Math.round((approvedCount / cleanJoinedRecords.length) * 100)
       : 0;
 
   return {
@@ -1381,15 +1502,15 @@ export async function fetchAndJoinTestAnalysis(
     tabGid: tab.gid,
     createdAt: timeInfo.iso,
     createdAtFormatted: timeInfo.formatted,
-    totalAgents: projectAgents.length, // Dinámico: Total de asesores únicos de Lista_agentes con este proyecto
+    totalAgents: cleanJoinedRecords.length, // Dinámico: Total de asesores únicos activos (excluyendo bajas)
     approvedCount,
     failedCount,
     pendingCount,
     passRate,
     averageScore: avgScore,
     trainingTopic: detectedCourseName || tab.name.split("-")[0]?.trim() || "Capacitación",
-    trainer: joinedRecords[0]?.trainerName || "Trainer Apex",
-    records: joinedRecords,
+    trainer: cleanJoinedRecords[0]?.trainerName || "Trainer Apex",
+    records: cleanJoinedRecords,
     isLiveFromGoogle: true,
     hasScoreColumn,
     discardedExternalCount,
@@ -1454,27 +1575,52 @@ function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] 
       };
     });
 
-    // Calcular métricas agregadas consistentes
-    const totalAgents = typeof raw.totalAgents === "number" && raw.totalAgents > 0 ? raw.totalAgents : normalizedRecords.length;
-    const approvedCount = normalizedRecords.filter((rec) => rec.status === "Aprobado").length;
-    const failedCount = normalizedRecords.filter((rec) => rec.status === "No Aprobado").length;
-    const pendingCount = normalizedRecords.filter((rec) => rec.status === "Pendiente").length;
+    // FILTRADO ESTRICTO DE BAJAS: Omitir de forma absoluta a los asesores que correspondan a baja
+    const cleanNormalizedRecords = normalizedRecords.filter((rec, rIdx) => {
+      const rawItem = rawRecords[rIdx];
+      return !isBajaRecord(rec) && (!rawItem || !isBajaRecord(rawItem));
+    });
+
+    // Calcular métricas agregadas consistentes (sin bajas)
+    const totalAgents = cleanNormalizedRecords.length;
+    const approvedCount = cleanNormalizedRecords.filter((rec) => rec.status === "Aprobado").length;
+    const failedCount = cleanNormalizedRecords.filter((rec) => rec.status === "No Aprobado").length;
+    const pendingCount = cleanNormalizedRecords.filter((rec) => rec.status === "Pendiente").length;
     const evaluated = approvedCount + failedCount;
     const passRate = evaluated > 0 ? Math.round((approvedCount / evaluated) * 100) : 0;
     
-    const scoredList = normalizedRecords.filter((rec) => rec.score !== null && !isNaN(rec.score as number));
+    const scoredList = cleanNormalizedRecords.filter((rec) => rec.score !== null && !isNaN(rec.score as number));
     const averageScore = scoredList.length > 0 ? Math.round(scoredList.reduce((acc, curr) => acc + (curr.score || 0), 0) / scoredList.length) : 0;
 
     const timeInfo = extractDateFromTabName(raw.name || raw.sheetName || "");
     const projectCode = raw.projectCode || extractProjectCode(raw.name || raw.sheetName || "") || (raw.name || "").toUpperCase().trim();
+
+    // Extraer marca de tiempo particular provista desde Apps Script (lastUpdate) o el objeto del test
+    const rawIndividualTimestamp =
+      raw.lastUpdate ||
+      raw.tabTimestamp ||
+      raw.timestamp ||
+      raw.lastModified ||
+      raw.updatedAt ||
+      raw.fechaHora ||
+      raw.fecha ||
+      raw.time ||
+      raw.date ||
+      raw.createdAtFormatted ||
+      raw.createdAt;
+
+    const formattedIndividualTimestamp = formatTabTimestamp(rawIndividualTimestamp, timeInfo.formatted);
 
     return {
       id: raw.id || `tab_${(raw.name || `test_${idx}`).replace(/[^a-zA-Z0-9_-]/g, "_")}`,
       name: raw.name || raw.sheetName || `Evaluación ${idx + 1}`,
       sheetName: raw.sheetName || raw.name || `Evaluación ${idx + 1}`,
       tabGid: raw.tabGid || null,
-      createdAt: raw.createdAt || timeInfo.iso,
-      createdAtFormatted: raw.createdAtFormatted || timeInfo.formatted,
+      createdAt: raw.createdAt || (rawIndividualTimestamp ? String(rawIndividualTimestamp) : timeInfo.iso),
+      createdAtFormatted: formattedIndividualTimestamp,
+      lastUpdate: raw.lastUpdate ? String(raw.lastUpdate) : (rawIndividualTimestamp ? String(rawIndividualTimestamp) : undefined),
+      tabTimestamp: rawIndividualTimestamp ? String(rawIndividualTimestamp) : undefined,
+      tabTimestampFormatted: formattedIndividualTimestamp,
       totalAgents,
       approvedCount,
       failedCount,
@@ -1483,7 +1629,7 @@ function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] 
       averageScore,
       trainingTopic: raw.trainingTopic || (raw.name ? raw.name.split("-")[0].trim() : "Capacitación"),
       trainer: raw.trainer || "Trainer Apex",
-      records: normalizedRecords,
+      records: cleanNormalizedRecords,
       isLiveFromGoogle: true,
       hasScoreColumn: raw.hasScoreColumn !== false,
       discardedExternalCount: raw.discardedExternalCount || 0,
@@ -1504,10 +1650,18 @@ export async function fetchUnifiedFromAppsScript(
 
   try {
     const sep = appsScriptUrl.includes("?") ? "&" : "?";
-    const unifiedUrl = `${appsScriptUrl}${sep}nocache=${Date.now()}`;
-    console.log("🚀 [Apps Script Fetch] Conectando al endpoint unificado de doGet:", unifiedUrl);
+    const cacheBuster = `cache=${Date.now()}`;
+    const unifiedUrl = `${appsScriptUrl}${sep}${cacheBuster}`;
+    console.log("🚀 [Apps Script Fetch] Conectando al endpoint unificado de doGet (cache bypass):", unifiedUrl);
     
-    const res = await fetch(unifiedUrl, { cache: "no-store", redirect: "follow" });
+    const res = await fetch(unifiedUrl, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+      redirect: "follow",
+    });
     if (!res.ok) {
       console.warn(`[Apps Script Fetch] HTTP status ${res.status}`);
       return null;
@@ -1588,8 +1742,9 @@ export async function fetchAllSheetAnalyses(
   // Detectar dinámicamente todas las pestañas de test (filtrando Lista_agentes y Config_Usuarios)
   const testTabs = await fetchSpreadsheetTestTabs(spreadsheetUrl);
 
-  // Consultar en vivo la pestaña Config_Usuarios para obtener el estado (Activo / No Activo) de cada test
-  const testStatusesMap = await fetchTestStatuses(spreadsheetUrl);
+  // Consultar en vivo la pestaña Config_Usuarios para obtener el estado (Activo / No Activo) y marcas de tiempo particulares
+  const testConfigMeta = await fetchTestConfigMetadata(spreadsheetUrl);
+  const { statusMap: testStatusesMap, timestampMap: testTimestampsMap } = testConfigMeta;
 
   const results: SheetAnalysisRecord[] = [];
 
@@ -1610,6 +1765,24 @@ export async function fetchAllSheetAnalyses(
         testStatus = "No Activo";
       }
 
+      // Asimilar marca de tiempo particular provista desde Config_Usuarios (si existe)
+      const tabSpecificTimestamp =
+        (projectCode && testTimestampsMap[projectCode]) ||
+        (cleanTabName && testTimestampsMap[cleanTabName]) ||
+        testTimestampsMap[tab.name.toUpperCase().trim()] ||
+        testTimestampsMap[tab.name];
+
+      if (tabSpecificTimestamp) {
+        const formatted = formatTabTimestamp(tabSpecificTimestamp, record.createdAtFormatted);
+        record.tabTimestamp = tabSpecificTimestamp;
+        record.tabTimestampFormatted = formatted;
+        record.createdAtFormatted = formatted;
+      } else {
+        const formatted = formatTabTimestamp(record.createdAtFormatted, record.createdAt);
+        record.tabTimestampFormatted = formatted;
+        record.createdAtFormatted = formatted;
+      }
+
       record.projectCode = projectCode;
       record.testStatus = testStatus;
       results.push(record);
@@ -1628,23 +1801,41 @@ export async function fetchAllSheetAnalyses(
     const projectCode = extractProjectCode(defaultTab.name);
     defaultRecord.projectCode = projectCode;
     defaultRecord.testStatus = testStatusesMap[projectCode] === "No Activo" ? "No Activo" : "Activo";
+    
+    const tabSpecificTimestamp = testTimestampsMap[projectCode] || testTimestampsMap[defaultTab.name.toUpperCase()];
+    if (tabSpecificTimestamp) {
+      const formatted = formatTabTimestamp(tabSpecificTimestamp, defaultRecord.createdAtFormatted);
+      defaultRecord.tabTimestamp = tabSpecificTimestamp;
+      defaultRecord.tabTimestampFormatted = formatted;
+      defaultRecord.createdAtFormatted = formatted;
+    } else {
+      defaultRecord.tabTimestampFormatted = formatTabTimestamp(defaultRecord.createdAtFormatted);
+    }
+
     results.push(defaultRecord);
   }
 
   return results;
 }
 
+export interface TestConfigMetadata {
+  statusMap: Record<string, "Activo" | "No Activo">;
+  timestampMap: Record<string, string>;
+}
+
 /**
- * Consulta la pestaña 'Config_Usuarios' en Google Sheets para obtener el estado centralizado
- * (Activo / No Activo) de cada evaluación.
- * Reutiliza la Columna A para el código del test (ej: "CD2633" o "CD2552") y la Columna C para el estado ("Activo" o "No Activo").
+ * Consulta la pestaña 'Config_Usuarios' en Google Sheets para obtener tanto el estado centralizado
+ * (Activo / No Activo) como las marcas de tiempo particulares por pestaña de examen.
  */
-export async function fetchTestStatuses(
+export async function fetchTestConfigMetadata(
   spreadsheetUrl: string = GOOGLE_SHEET_URL
-): Promise<Record<string, "Activo" | "No Activo">> {
+): Promise<TestConfigMetadata> {
   const sheetId = extractSpreadsheetId(spreadsheetUrl);
-  const statusMap: Record<string, "Activo" | "No Activo"> = {};
-  if (!sheetId) return statusMap;
+  const result: TestConfigMetadata = {
+    statusMap: {},
+    timestampMap: {},
+  };
+  if (!sheetId) return result;
 
   const candidateTabNames = [
     "Config_Usuarios",
@@ -1689,9 +1880,9 @@ export async function fetchTestStatuses(
     if (rawCsvRows.length > 0) break;
   }
 
-  if (rawCsvRows.length === 0) return statusMap;
+  if (rawCsvRows.length === 0) return result;
 
-  // Analizar filas: Columna A (código de test/usuario) y Columna C (estado Activo / No Activo)
+  // Analizar filas: Columna A (código de test/usuario), Columna C (estado Activo / No Activo) y columnas con fechas/marcas de tiempo
   for (let r = 0; r < rawCsvRows.length; r++) {
     const row = rawCsvRows[r];
     if (!row || row.length === 0) continue;
@@ -1699,12 +1890,12 @@ export async function fetchTestStatuses(
     const colA = sanitizeAuthCell(row[0]).trim();
     if (!colA) continue;
 
-    // Columna C (índice 2)
-    const colC = row.length > 2 ? sanitizeAuthCell(row[2]).trim() : "";
-    const normC = cleanHeaderString(colC);
-
     const normA = cleanHeaderString(colA);
     const codeA = extractProjectCode(colA) || colA.toUpperCase().replace(/\s+/g, "");
+
+    // 1. Estado Activo / No Activo (Columna C / Índice 2 por defecto o detección en fila)
+    const colC = row.length > 2 ? sanitizeAuthCell(row[2]).trim() : "";
+    const normC = cleanHeaderString(colC);
 
     let state: "Activo" | "No Activo" = "Activo";
     if (
@@ -1726,7 +1917,6 @@ export async function fetchTestStatuses(
     ) {
       state = "Activo";
     } else {
-      // Búsqueda en toda la fila por si la columna de estado está en otra posición
       const anyNoActive = row.some((c) => {
         const nc = cleanHeaderString(c);
         return nc === "noactivo" || nc === "inactivo" || nc === "desactivado";
@@ -1736,16 +1926,50 @@ export async function fetchTestStatuses(
       }
     }
 
-    if (codeA) {
-      statusMap[codeA] = state;
+    if (codeA) result.statusMap[codeA] = state;
+    if (normA) result.statusMap[normA] = state;
+    result.statusMap[colA.toUpperCase()] = state;
+
+    // 2. Extraer marca de tiempo individual de la fila (buscar en todas las celdas de la fila fecha/hora válida)
+    let foundTimestamp: string | null = null;
+    for (let c = 1; c < row.length; c++) {
+      const cellVal = sanitizeAuthCell(row[c]).trim();
+      if (!cellVal) continue;
+
+      const normCell = cleanHeaderString(cellVal);
+      if (normCell === "activo" || normCell === "noactivo" || normCell === "inactivo") continue;
+
+      const hasDatePattern =
+        /\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}/.test(cellVal) ||
+        /\d{4}[\/\.-]\d{1,2}[\/\.-]\d{1,2}/.test(cellVal) ||
+        (cellVal.includes(":") && /\d{1,2}:\d{2}/.test(cellVal));
+
+      if (hasDatePattern) {
+        foundTimestamp = cellVal;
+        break;
+      }
     }
-    if (normA) {
-      statusMap[normA] = state;
+
+    if (foundTimestamp) {
+      if (codeA) result.timestampMap[codeA] = foundTimestamp;
+      if (normA) result.timestampMap[normA] = foundTimestamp;
+      result.timestampMap[colA.toUpperCase()] = foundTimestamp;
+      result.timestampMap[colA] = foundTimestamp;
     }
-    statusMap[colA.toUpperCase()] = state;
   }
 
-  return statusMap;
+  return result;
+}
+
+/**
+ * Consulta la pestaña 'Config_Usuarios' en Google Sheets para obtener el estado centralizado
+ * (Activo / No Activo) de cada evaluación.
+ */
+export async function fetchTestStatuses(
+  spreadsheetUrl: string = GOOGLE_SHEET_URL
+): Promise<Record<string, "Activo" | "No Activo">> {
+  const meta = await fetchTestConfigMetadata(spreadsheetUrl);
+  return meta.statusMap;
 }
 
 // =========================================================================

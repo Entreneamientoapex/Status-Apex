@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { AgentRecord } from "../types";
+import { isBajaRecord } from "./bajaFilter";
 
 export interface ParsedExcelResult {
   fileName: string;
@@ -84,6 +85,7 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParsedExcelResult
           for (let i = 0; i < matrix.length; i++) {
             const row = matrix[i];
             if (!row || row.length === 0) continue;
+            if (isBajaRecord(row)) continue;
 
             const rawId = String(row[0] || "").replace(/^["']|["']$/g, "").trim();
             if (!rawId) continue;
@@ -429,14 +431,19 @@ export async function parseExcelOrCsvFile(file: File): Promise<ParsedExcelResult
           };
         });
 
+        // FILTRADO ESTRICTO DE BAJAS: Omitir absolutamente asesores de baja o con fondo rojo/rosado
+        const filteredAgents = (detectedAgents as AgentRecord[]).filter(
+          (a, idx) => !isBajaRecord(a) && !isBajaRecord(rawRows[idx])
+        );
+
         resolve({
           fileName: file.name,
-          rowCount: rawRows.length,
+          rowCount: filteredAgents.length,
           headers,
           rawRows,
-          detectedAgents,
-          suggestedTopic: detectedAgents[0]?.trainingName,
-          suggestedTrainer: detectedAgents[0]?.trainerName,
+          detectedAgents: filteredAgents,
+          suggestedTopic: filteredAgents[0]?.trainingName,
+          suggestedTrainer: filteredAgents[0]?.trainerName,
         });
       } catch (err: any) {
         reject(new Error("Error al leer el archivo Excel/CSV: " + err.message));

@@ -38,6 +38,8 @@ export interface AgentRecord {
   batchId?: string;
   sourceFileName?: string;
   testBreakdown?: AgentTestDetail[]; // Desglose individual cuando hay 1 o más tests seleccionados
+  isBaja?: boolean; // Si el asesor está dado de baja o inactivo
+  backgroundColor?: string; // Color de fondo detectado en la planilla
 }
 
 export interface TrainingBatch {

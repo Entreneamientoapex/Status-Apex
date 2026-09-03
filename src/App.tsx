@@ -15,6 +15,7 @@ import { GuestFeedbackModal } from "./components/GuestFeedbackModal";
 import { INITIAL_DEMO_RECORDS, INITIAL_BATCH } from "./utils/demoData";
 import { exportAgentsToExcel } from "./utils/excelParser";
 import { AgentRecord, AgentTestDetail, ApprovalStatus, TrainingBatch } from "./types";
+import { isBajaRecord } from "./utils/bajaFilter";
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -158,20 +159,52 @@ export default function App() {
     fromCache = false
   ) => {
     if (!analyses || analyses.length === 0) return;
-    setHistory(analyses);
-    const hasLiveRecord = analyses.some((a) => a.isLiveFromGoogle);
+
+    // FILTRADO ESTRICTO DE BAJAS: Sanitizar cada análisis para excluir absolutamente a los agentes de baja o rojos
+    const sanitizedAnalyses: SheetAnalysisRecord[] = analyses.map((a) => {
+      const cleanRecs = (a.records || []).filter((r) => !isBajaRecord(r));
+      const appCount = cleanRecs.filter((r) => r.status === "Aprobado").length;
+      const failCount = cleanRecs.filter((r) => r.status === "No Aprobado").length;
+      const pendCount = cleanRecs.filter(
+        (r) => r.status === "Pendiente" || (r.status !== "Aprobado" && r.status !== "No Aprobado")
+      ).length;
+      const validScores = cleanRecs
+        .filter((r) => r.status !== "Pendiente")
+        .map((r) => r.score)
+        .filter((s): s is number => typeof s === "number" && !isNaN(s));
+      const avg =
+        validScores.length > 0
+          ? Math.round(validScores.reduce((acc, c) => acc + c, 0) / validScores.length)
+          : 0;
+      const evalCount = appCount + failCount;
+      const pRate = evalCount > 0 ? Math.round((appCount / evalCount) * 100) : 0;
+
+      return {
+        ...a,
+        totalAgents: cleanRecs.length,
+        approvedCount: appCount,
+        failedCount: failCount,
+        pendingCount: pendCount,
+        passRate: pRate,
+        averageScore: avg,
+        records: cleanRecs,
+      };
+    });
+
+    setHistory(sanitizedAnalyses);
+    const hasLiveRecord = sanitizedAnalyses.some((a) => a.isLiveFromGoogle);
     if (hasLiveRecord || fromCache) {
       setIsLiveFromGoogle(true);
       setNeedsPermissionNotice(false);
     }
 
-    let selected = analyses.find((a) => a.id === activeAnalysisId);
+    let selected = sanitizedAnalyses.find((a) => a.id === activeAnalysisId);
     if (!selected && typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const paramTest = urlParams.get("test") || urlParams.get("tab");
       if (paramTest) {
         const decodedParam = decodeURIComponent(paramTest).toLowerCase();
-        selected = analyses.find(
+        selected = sanitizedAnalyses.find(
           (a) =>
             a.id.toLowerCase() === decodedParam ||
             a.name.toLowerCase() === decodedParam ||
@@ -180,7 +213,7 @@ export default function App() {
       }
     }
     if (!selected) {
-      selected = analyses[0];
+      selected = sanitizedAnalyses[0];
     }
 
     setActiveAnalysisId(selected.id);
@@ -366,7 +399,8 @@ export default function App() {
   // Switch Active Analysis / Tab (ACTION_SELECT_TEST)
   const handleSelectAnalysis = (analysis: SheetAnalysisRecord) => {
     setActiveAnalysisId(analysis.id);
-    setRecords(analysis.records);
+    const cleanRecs = (analysis.records || []).filter((r) => !isBajaRecord(r));
+    setRecords(cleanRecs);
     setSelectedTestIds([]);
 
     // Reset de estados y filtros previos al cambiar de curso activo
@@ -379,13 +413,13 @@ export default function App() {
       fileName: analysis.name,
       fileType: "document",
       uploadDate: analysis.createdAt.split("T")[0],
-      totalAgents: analysis.totalAgents,
-      approvedCount: analysis.approvedCount,
-      failedCount: analysis.failedCount,
+      totalAgents: cleanRecs.length,
+      approvedCount: cleanRecs.filter((r) => r.status === "Aprobado").length,
+      failedCount: cleanRecs.filter((r) => r.status === "No Aprobado").length,
       averageScore: analysis.averageScore,
       trainingTopic: analysis.trainingTopic,
       trainer: analysis.trainer,
-      records: analysis.records,
+      records: cleanRecs,
     });
 
     showToast(`Pestaña "${analysis.name}" cargada en el dashboard.`, "success");
@@ -399,33 +433,36 @@ export default function App() {
 
   // Derive records based on active test selection (single tab or multi-test checkboxes)
   const currentTestRecords = useMemo(() => {
+    const cleanBaseRecords = records.filter((r) => !isBajaRecord(r));
     if (selectedTestIds.length === 0) {
-      return records;
+      return cleanBaseRecords;
     }
     const matchingTests = history.filter((h) => selectedTestIds.includes(h.id));
     if (matchingTests.length === 0) {
-      return records;
+      return cleanBaseRecords;
     }
 
     if (matchingTests.length === 1) {
       const single = matchingTests[0];
       const singleName = single.name || single.trainingTopic || single.sheetName || "Evaluación";
-      return (single.records || []).map((r) => ({
-        ...r,
-        testBreakdown: [
-          {
-            testId: single.id,
-            testName: singleName,
-            trainingTopic: r.trainingName || single.trainingTopic,
-            trainerName: r.trainerName || single.trainer,
-            score: r.score,
-            minPassingScore: r.minPassingScore || 80,
-            status: r.status,
-            passedInRetake: r.passedInRetake,
-            retakeScore: r.retakeScore,
-          },
-        ],
-      }));
+      return (single.records || [])
+        .filter((r) => !isBajaRecord(r))
+        .map((r) => ({
+          ...r,
+          testBreakdown: [
+            {
+              testId: single.id,
+              testName: singleName,
+              trainingTopic: r.trainingName || single.trainingTopic,
+              trainerName: r.trainerName || single.trainer,
+              score: r.score,
+              minPassingScore: r.minPassingScore || 80,
+              status: r.status,
+              passedInRetake: r.passedInRetake,
+              retakeScore: r.retakeScore,
+            },
+          ],
+        }));
     }
 
     // Consolidate across multiple tests (2 or more active evaluations)
@@ -440,17 +477,19 @@ export default function App() {
     >();
 
     matchingTests.forEach((analysis) => {
-      (analysis.records || []).forEach((r) => {
-        const key = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim()).toLowerCase();
-        if (!key) return;
-        if (!agentMap.has(key)) {
-          agentMap.set(key, {
-            base: { ...r },
-            scores: [],
-            statuses: [],
-            retakeScores: [],
-          });
-        }
+      (analysis.records || [])
+        .filter((r) => !isBajaRecord(r))
+        .forEach((r) => {
+          const key = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim()).toLowerCase();
+          if (!key) return;
+          if (!agentMap.has(key)) {
+            agentMap.set(key, {
+              base: { ...r },
+              scores: [],
+              statuses: [],
+              retakeScores: [],
+            });
+          }
         const entry = agentMap.get(key)!;
         if (
           r.supervisor &&
@@ -569,7 +608,8 @@ export default function App() {
 
   // Derive filtered records by selected JCC and selected supervisor
   const displayRecords = useMemo(() => {
-    let result = currentTestRecords;
+    // FILTRADO ESTRICTO DE BAJAS: Asegurar que displayRecords jamás contenga registros de baja
+    let result = currentTestRecords.filter((r) => !isBajaRecord(r));
 
     if (selectedJCC) {
       const jccLower = selectedJCC.trim().toLowerCase();

@@ -14,6 +14,7 @@ import {
   Layers,
 } from "lucide-react";
 import { AgentRecord, ApprovalStatus } from "../types";
+import { isBajaRecord } from "../utils/bajaFilter";
 
 interface StatsCardsProps {
   records: AgentRecord[];
@@ -41,23 +42,26 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   selectedTestCount = 0,
   onClearTestFilter,
 }) => {
+  // FILTRADO ESTRICTO DE BAJAS: Omitir de forma absoluta a los asesores marcados como baja o con fondo rojo/rosado
+  const cleanRecords = records.filter((r) => !isBajaRecord(r));
+
   // 1. CARD 1 (Total Agentes): Muestra el número neto de agentes que cumplen con los filtros activos.
-  const total = records.length;
+  const total = cleanRecords.length;
 
   // 2. CARD 2 (Aprobados): Cuenta cuántos de esos agentes filtrados tienen una nota final mayor o igual a 80 puntos.
-  const approved = records.filter((r) => {
+  const approved = cleanRecords.filter((r) => {
     if (typeof r.score === "number" && !isNaN(r.score)) {
       return r.score >= 80;
     }
     return r.status === "Aprobado";
   }).length;
 
-  const retakeApproved = records.filter(
+  const retakeApproved = cleanRecords.filter(
     (r) => (r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80)) && r.passedInRetake
   ).length;
 
   // 3. CARD 3 (No Aprobados): Cuenta cuántos de esos agentes filtrados tienen notas registradas menores a 80 puntos.
-  const failed = records.filter((r) => {
+  const failed = cleanRecords.filter((r) => {
     if (typeof r.score === "number" && !isNaN(r.score)) {
       return r.score < 80 && r.score >= 0;
     }
@@ -65,16 +69,16 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   }).length;
 
   // 4. CARD 4 (Pendientes): Cuenta cuántos agentes de la nómina seleccionada no registran ninguna nota en los tests activos.
-  const pending = records.filter((r) => {
+  const pending = cleanRecords.filter((r) => {
     const hasScore = typeof r.score === "number" && !isNaN(r.score);
     if (r.status === "Pendiente") return true;
     if (!hasScore && r.status !== "Aprobado" && r.status !== "No Aprobado") return true;
     return false;
   }).length;
 
-  const needsRetrainingCount = records.filter((r) => r.needsRetraining).length;
+  const needsRetrainingCount = cleanRecords.filter((r) => r.needsRetraining).length;
 
-  // Porcentajes internos calculados sobre el Total Agentes activo (universo filtrado)
+  // Porcentajes internos calculados sobre el Total Agentes activo (universo filtrado sin bajas)
   const approvedPct = total > 0 ? (approved / total) * 100 : 0;
   const failedPct = total > 0 ? (failed / total) * 100 : 0;
   const pendingPct = total > 0 ? (pending / total) * 100 : 0;
