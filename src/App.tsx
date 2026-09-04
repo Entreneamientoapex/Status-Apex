@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Navbar } from "./components/Navbar";
-import { StatsCards } from "./components/StatsCards";
+import { StatsCards } from "./components/StatsCards"; // Metric cards component
 import { AgentTable } from "./components/AgentTable";
 import { AnalyticsCharts } from "./components/AnalyticsCharts";
 import { AgentDetailModal } from "./components/AgentDetailModal";
@@ -160,7 +160,7 @@ export default function App() {
   ) => {
     if (!analyses || analyses.length === 0) return;
 
-    // FILTRADO ESTRICTO DE BAJAS: Sanitizar cada análisis para excluir absolutamente a los agentes de baja o rojos
+    // FILTRADO ESTRICTO DE BAJAS: Sanitizar cada análisis para excluir absolutamente a los agentes de baja
     const sanitizedAnalyses: SheetAnalysisRecord[] = analyses.map((a) => {
       const cleanRecs = (a.records || []).filter((r) => !isBajaRecord(r));
       const appCount = cleanRecs.filter((r) => r.status === "Aprobado").length;
@@ -213,7 +213,16 @@ export default function App() {
       }
     }
     if (!selected) {
-      selected = sanitizedAnalyses[0];
+      // Priorizar el curso principal con los 253 asesores (CD2633) si está presente
+      selected =
+        sanitizedAnalyses.find(
+          (a) =>
+            a.name.includes("CD2633") ||
+            a.sheetName.includes("CD2633") ||
+            a.id.includes("CD2633")
+        ) ||
+        [...sanitizedAnalyses].sort((a, b) => (b.totalAgents || 0) - (a.totalAgents || 0))[0] ||
+        sanitizedAnalyses[0];
     }
 
     setActiveAnalysisId(selected.id);
@@ -608,7 +617,6 @@ export default function App() {
 
   // Derive filtered records by selected JCC and selected supervisor
   const displayRecords = useMemo(() => {
-    // FILTRADO ESTRICTO DE BAJAS: Asegurar que displayRecords jamás contenga registros de baja
     let result = currentTestRecords.filter((r) => !isBajaRecord(r));
 
     if (selectedJCC) {

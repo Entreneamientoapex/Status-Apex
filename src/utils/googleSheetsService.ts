@@ -1,7 +1,10 @@
 import { AgentRecord, ApprovalStatus, ConfigUser } from "../types";
 import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL, DEFAULT_PASSING_SCORE, KNOWN_SHEET_TABS } from "./googleSheetsConfig";
 import { INITIAL_DEMO_RECORDS } from "./demoData";
-import { isBajaRecord } from "./bajaFilter";
+import {
+  isBajaRecord,
+  isValidEntityName,
+} from "./bajaFilter";
 
 export interface SheetTabInfo {
   name: string;
@@ -651,7 +654,7 @@ export async function fetchMasterAgentList(
     const row = dataRows[i];
     if (!row || row.every((c) => !c || c.trim() === "")) continue;
 
-    // FILTRADO ESTRICTO DE BAJAS: Omitir fila si viene marcada como baja o posee fondo rojo
+    // Solo omitir si la fila viene explícitamente marcada como baja confirmada
     if (isBajaRecord(row)) continue;
 
     const rawLegajo = colLegajo !== -1 ? row[colLegajo]?.trim() : "";
@@ -660,34 +663,32 @@ export async function fetchMasterAgentList(
     const rawJcc = resolvedColJcc !== -1 ? row[resolvedColJcc]?.trim() : "";
     const rawCampaign = colCampaign !== -1 ? row[colCampaign]?.trim() : "";
 
-    const legajo = rawLegajo || `U${100000 + i}`;
+    // Solo omitir si la fila no tiene ningún dato de campaña, legajo ni nombre
+    if (!rawCampaign && !rawLegajo && !rawNombre) {
+      continue;
+    }
+
+    const legajo = rawLegajo || `u${100000 + i + 1}`;
     const name = rawNombre || `Asesor ${i + 1}`;
     
-    // Normalización estricta: Si la celda está vacía, contiene solo espacios o es "Sin Supervisor Asignado", forzar a "Staff"
+    // Normalización: Si la celda de supervisor está vacía, con guiones o sin asignar, mapear a "Staff"
     const cleanSup = rawSupervisor ? rawSupervisor.trim() : "";
     const supervisor =
       !cleanSup ||
       cleanSup === "-" ||
       cleanSup.toLowerCase() === "sin supervisor asignado" ||
       cleanSup.toLowerCase() === "sin supervisor" ||
-      cleanSup.toLowerCase() === "sin asignar"
+      cleanSup.toLowerCase() === "sin asignar" ||
+      cleanSup.toLowerCase().includes("#n/a")
         ? "Staff"
         : cleanSup;
 
-    const jcc = rawJcc && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
+    // Normalización: Si JCC está vacío o sin asignar, mapear a "Sin JCC Asignado"
+    const jcc =
+      rawJcc && rawJcc !== "-" && !rawJcc.toLowerCase().includes("#n/a")
+        ? rawJcc
+        : "Sin JCC Asignado";
     const campaign = rawCampaign && rawCampaign !== "-" ? rawCampaign : "Operaciones";
-
-    if (
-      isBajaRecord({
-        agentName: name,
-        agentId: legajo,
-        supervisor,
-        jcc,
-        campaign,
-      })
-    ) {
-      continue;
-    }
 
     masterAgents.push({
       legajo,
@@ -1555,7 +1556,7 @@ function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] 
         agentId: String(r.agentId || r.legajo || r.id || `L${rIdx + 1}`),
         campaign: r.campaign || r.campana || "Operaciones",
         supervisor: sup,
-        jcc: r.jcc || r.jefe || "",
+        jcc: r.jcc || r.jefe || "Sin JCC Asignado",
         trainingName: r.trainingName || raw.name || "Capacitación Operativa",
         trainerName: r.trainerName || raw.trainer || "Trainer Responsable",
         completionDate: r.completionDate || (raw.createdAt ? String(raw.createdAt).split("T")[0] : new Date().toISOString().split("T")[0]),

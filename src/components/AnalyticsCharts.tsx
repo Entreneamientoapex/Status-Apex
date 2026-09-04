@@ -4,6 +4,7 @@ import { AnalysisHistoryCard } from "./AnalysisHistoryCard";
 import { JCCCard } from "./JCCCard";
 import { SupervisorCard } from "./SupervisorCard";
 import { SheetAnalysisRecord } from "../utils/googleSheetsService";
+import { isBajaRecord } from "../utils/bajaFilter";
 
 interface AnalyticsChartsProps {
   records: AgentRecord[];
@@ -44,16 +45,21 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
 }) => {
   if (records.length === 0 && history.length === 0) return null;
 
+  // Filtrar registros de baja
+  const cleanValidRecords = React.useMemo(() => {
+    return records.filter((r) => !isBajaRecord(r));
+  }, [records]);
+
   // Si hay un JCC seleccionado, la columna de Supervisores debe recibir los asesores correspondientes a ese JCC
   const supervisorColumnRecords = React.useMemo(() => {
-    if (!selectedJCC) return records;
+    if (!selectedJCC) return cleanValidRecords;
     const jccLower = selectedJCC.trim().toLowerCase();
-    return records.filter((r) => {
+    return cleanValidRecords.filter((r) => {
       const rawJcc = r.jcc?.trim();
       const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
       return jccName.toLowerCase() === jccLower;
     });
-  }, [records, selectedJCC]);
+  }, [cleanValidRecords, selectedJCC]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -74,7 +80,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
 
       {/* COLUMNA 2 (Central): JCC (Agrupación dinámica de asesores por JCC y % de avance/tests) */}
       <JCCCard
-        records={records}
+        records={cleanValidRecords}
         history={history}
         selectedTestIds={selectedTestIds}
         activeAnalysisId={activeAnalysisId}

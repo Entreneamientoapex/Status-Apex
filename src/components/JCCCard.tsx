@@ -3,6 +3,10 @@ import { Briefcase, ChevronRight, Check, Search, X, Users } from "lucide-react";
 import { AgentRecord } from "../types";
 import { SheetAnalysisRecord } from "../utils/googleSheetsService";
 import { isAgentEvaluated, getDynamicTabAcronym } from "./SupervisorCard";
+import {
+  isBajaRecord,
+  isValidEntityName,
+} from "../utils/bajaFilter";
 
 interface JCCCardProps {
   records: AgentRecord[];
@@ -130,8 +134,14 @@ export const JCCCard: React.FC<JCCCardProps> = ({
     >();
 
     records.forEach((r) => {
+      // Filtrar bajas
+      if (isBajaRecord(r)) return;
+
       const rawJcc = r.jcc?.trim();
-      const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
+      const jccName =
+        rawJcc && rawJcc.length > 0 && rawJcc !== "-" && !rawJcc.toLowerCase().includes("#n/a")
+          ? rawJcc
+          : "Sin JCC Asignado";
 
       if (!map.has(jccName)) {
         map.set(jccName, {
@@ -168,21 +178,27 @@ export const JCCCard: React.FC<JCCCardProps> = ({
     });
 
     return Array.from(map.values())
+      .filter((data) => data.total > 0)
       .map((data) => {
-        // Conteo único y sin duplicados de supervisores vinculados a este JCC
         const uniqueSupervisors = new Set<string>();
         const uniqueAgents = new Set<string>();
 
         data.agents.forEach((r) => {
+          if (isBajaRecord(r)) return;
+
           const agentKey = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim() || "").toLowerCase();
-          if (agentKey) uniqueAgents.add(agentKey);
+          if (agentKey) {
+            uniqueAgents.add(agentKey);
+          }
 
           const rawSup = r.supervisor?.trim();
           if (
             rawSup &&
+            rawSup !== "" &&
             rawSup !== "-" &&
             !rawSup.toLowerCase().startsWith("sin supervisor") &&
-            !rawSup.toLowerCase().startsWith("sin asignar")
+            !rawSup.toLowerCase().startsWith("sin asignar") &&
+            !rawSup.toLowerCase().includes("#n/a")
           ) {
             uniqueSupervisors.add(rawSup.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
           }
@@ -205,10 +221,14 @@ export const JCCCard: React.FC<JCCCardProps> = ({
               const acronym = getDynamicTabAcronym(evalItem.name || evalItem.sheetName, index);
               const evalRecords = evalItem.records || [];
 
-              // Filtrar todos los asesores que dependen de este JCC en este examen específico
+              // Filtrar todos los asesores válidos que dependen de este JCC en este examen específico
               const jccTestAgents = evalRecords.filter((r) => {
+                if (isBajaRecord(r)) return false;
                 const rawJcc = r.jcc?.trim();
-                const jccName = rawJcc && rawJcc.length > 0 && rawJcc !== "-" ? rawJcc : "Sin JCC Asignado";
+                const jccName =
+                  rawJcc && rawJcc.length > 0 && rawJcc !== "-" && !rawJcc.toLowerCase().includes("#n/a")
+                    ? rawJcc
+                    : "Sin JCC Asignado";
                 return jccName.toLowerCase() === data.jcc.toLowerCase();
               });
 
@@ -241,11 +261,18 @@ export const JCCCard: React.FC<JCCCardProps> = ({
       .sort((a, b) => a.jcc.localeCompare(b.jcc, "es", { sensitivity: "base" }));
   }, [records, activeEvaluations]);
 
-  // Filter JCCs in real-time by search query
+  // Filter JCCs in real-time by search query, descartando de forma absoluta cualquier entrada #N/A o rota
   const filteredJCCs = useMemo(() => {
-    if (!searchTerm.trim()) return jccStats;
+    const validJCCs = jccStats.filter(
+      (item) =>
+        isValidEntityName(item.jcc) &&
+        !item.jcc.toLowerCase().includes("#n/a") &&
+        !item.jcc.toLowerCase().includes("#n/d") &&
+        item.total > 0
+    );
+    if (!searchTerm.trim()) return validJCCs;
     const query = searchTerm.toLowerCase().trim();
-    return jccStats.filter((item) => item.jcc.toLowerCase().includes(query));
+    return validJCCs.filter((item) => item.jcc.toLowerCase().includes(query));
   }, [jccStats, searchTerm]);
 
   const handleJCCClick = (jccName: string) => {
@@ -361,34 +388,28 @@ export const JCCCard: React.FC<JCCCardProps> = ({
                         </div>
                       )}
                       <p
-                        className={`font-sans font-bold text-sm tracking-normal truncate transition-colors ${
+                        className={`text-xs sm:text-sm font-semibold truncate transition-colors ${
                           isSelected
                             ? "text-[#2B579A]"
-                            : "text-slate-900 group-hover:text-[#2B579A]"
+                            : "text-[#2D332A] group-hover:text-[#2B579A]"
                         }`}
                       >
                         {item.jcc}
                       </p>
                     </div>
-                    <p className="font-sans font-medium text-slate-500 text-xs mt-1 flex items-center gap-1.5">
-                      <span>
-                        {getCardSubtitle(item.jcc, item.supervisorCount, item.staffCount)}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Media: {item.avgScore > 0 ? `${item.avgScore} pts` : "Sin notas"}
-                      </span>
+                    <p className="text-[11px] text-[#6B7366] mt-0.5">
+                      {getCardSubtitle(item.jcc, item.supervisorCount, item.staffCount)}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className={`inline-block px-3 py-1 rounded-full text-[11px] font-sans font-black uppercase shadow-sm whitespace-nowrap text-white ${
+                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                         item.porcentajeAvance >= 80
-                          ? "bg-[#16a34a]"
+                          ? "bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1]"
                           : item.porcentajeAvance >= 40
-                          ? "bg-[#d97706]"
-                          : "bg-[#dc2626]"
+                          ? "bg-[#FEF6E7] text-[#B76E00] border border-[#F6DCAC]"
+                          : "bg-[#FDECEB] text-[#C5221F] border border-[#F8C8C6]"
                       }`}
                     >
                       {isMultiTest && item.multiTestBadge

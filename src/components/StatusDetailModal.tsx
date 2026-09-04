@@ -86,6 +86,7 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
         (r.agentId && r.agentId.toLowerCase().includes(q)) ||
         r.agentName.toLowerCase().includes(q) ||
         (r.campaign && r.campaign.toLowerCase().includes(q)) ||
+        (r.supervisor && r.supervisor.toLowerCase().includes(q)) ||
         (r.trainerName && r.trainerName.toLowerCase().includes(q)) ||
         (r.feedback && r.feedback.toLowerCase().includes(q)) ||
         (r.retakeDetails && r.retakeDetails.toLowerCase().includes(q))
@@ -340,6 +341,18 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
                 const isPending = !isApproved && !isFailed;
                 const isRetake = !!agent.passedInRetake;
 
+                const supervisorName =
+                  agent.supervisor &&
+                  agent.supervisor.trim() !== "" &&
+                  agent.supervisor.trim() !== "-" &&
+                  agent.supervisor.toLowerCase() !== "sin supervisor" &&
+                  agent.supervisor.toLowerCase() !== "sin supervisor asignado" &&
+                  agent.supervisor.toLowerCase() !== "sin asignar"
+                    ? agent.supervisor
+                    : agent.trainerName && agent.trainerName !== "Sin Trainer" && agent.trainerName !== "No asignado"
+                    ? agent.trainerName
+                    : "Staff";
+
                 return (
                   <div
                     key={agent.id || agent.agentId || index}
@@ -347,7 +360,7 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
                       isRetake ? "border-[#BDE0C7] hover:border-[#8DA189] bg-[#FCFDFB]" : "border-[#D9DED4] hover:border-[#8DA189]"
                     }`}
                   >
-                    {/* Left: ID, Name, Campaign, Trainer & Retake Tag */}
+                    {/* Left: ID, Name, Campaign, Supervisor & Retake Tag */}
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
                       <div
                         className={`h-9 w-9 rounded-xl border flex items-center justify-center text-xs font-bold shrink-0 font-mono ${
@@ -386,7 +399,7 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
                           </span>
                           <span>•</span>
                           <span>
-                            Trainer: <strong className="text-[#2D332A] font-medium">{agent.trainerName || "No asignado"}</strong>
+                            Sup: <strong className="text-[#2D332A] font-medium">{supervisorName}</strong>
                           </span>
                           {isRetake && agent.initialScore !== undefined && agent.initialScore !== null && (
                             <>

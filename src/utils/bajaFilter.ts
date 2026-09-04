@@ -37,50 +37,52 @@ export function isRedOrPinkColor(color: unknown): boolean {
   const str = String(color).trim().toLowerCase();
   if (!str) return false;
 
-  // Nombres comunes de color rojo / rosado
+  // Nombres comunes de color rojo / rosado (comparación exacta para evitar falsos positivos)
   const RED_PINK_NAMES = [
     "red", "rojo", "pink", "rosado", "rosa", "lightcoral", "crimson",
     "salmon", "darksalmon", "lightpink", "hotpink", "deeppink",
     "palevioletred", "coral", "indianred", "firebrick", "rose",
     "danger", "danger-red", "soft-red", "light-red", "pastel-red"
   ];
-  if (RED_PINK_NAMES.some((name) => str === name || str.includes(name))) {
+  if (RED_PINK_NAMES.includes(str)) {
     return true;
   }
 
-  // Hexadecimal (#RRGGBB, #RGB, #AARRGGBB)
-  const hexMatch = str.match(/#?([0-9a-f]{3,8})/i);
-  if (hexMatch) {
-    let hex = hexMatch[1];
-    // Si es ARGB de 8 caracteres (ej. FFF87171), descartar canal alfa inicial si no es relevante
-    if (hex.length === 8) {
-      hex = hex.slice(2);
-    }
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (hex.length === 3) {
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-    } else if (hex.length >= 6) {
-      r = parseInt(hex.slice(0, 2), 16);
-      g = parseInt(hex.slice(2, 4), 16);
-      b = parseInt(hex.slice(4, 6), 16);
-    }
+  // Hexadecimal (#RRGGBB, #RGB, #AARRGGBB) - REQUIERE que comience con '#'
+  if (str.startsWith("#")) {
+    const hexMatch = str.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (hexMatch) {
+      let hex = hexMatch[1];
+      // Si es ARGB de 8 caracteres (ej. FFF87171), descartar canal alfa inicial si no es relevante
+      if (hex.length === 8) {
+        hex = hex.slice(2);
+      }
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      if (hex.length === 3) {
+        r = parseInt(hex[0] + hex[0], 16);
+        g = parseInt(hex[1] + hex[1], 16);
+        b = parseInt(hex[2] + hex[2], 16);
+      } else if (hex.length >= 6) {
+        r = parseInt(hex.slice(0, 2), 16);
+        g = parseInt(hex.slice(2, 4), 16);
+        b = parseInt(hex.slice(4, 6), 16);
+      }
 
-    // 1. Rojo intenso o estándar (ej. #ea4335, #ef4444, #dc2626, #b91c1c, #d32f2f)
-    if (r >= 150 && r > g * 1.25 && r > b * 1.25) {
-      return true;
-    }
-    // 2. Rosado / pastel suave (ej. #fca5a5, #fecaca, #fee2e2, #fda4af, #fb7185, #f8d7da, #f4c7c3, #ffcdd2, #ffebee)
-    if (r >= 180 && r >= g + 15 && (r >= b + 15 || (b >= 130 && r >= g + 18))) {
-      return true;
+      // 1. Rojo intenso o estándar (ej. #ea4335, #ef4444, #dc2626, #b91c1c, #d32f2f)
+      if (r >= 150 && r > g * 1.25 && r > b * 1.25) {
+        return true;
+      }
+      // 2. Rosado / pastel suave (ej. #fca5a5, #fecaca, #fee2e2, #fda4af, #fb7185, #f8d7da, #f4c7c3, #ffcdd2, #ffebee)
+      if (r >= 180 && r >= g + 15 && (r >= b + 15 || (b >= 130 && r >= g + 18))) {
+        return true;
+      }
     }
   }
 
   // Formato rgb(r, g, b) o rgba(r, g, b, a)
-  const rgbMatch = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  const rgbMatch = str.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
     const g = parseInt(rgbMatch[2], 10);
@@ -93,13 +95,65 @@ export function isRedOrPinkColor(color: unknown): boolean {
 }
 
 /**
+ * Detecta si una cadena o valor representa un error de fórmula Excel/Google Sheets,
+ * valor no disponible (#N/A, #N/D), nulo, indefinido, vacío o no válido.
+ */
+export function isInvalidOrBrokenValue(val: unknown): boolean {
+  if (val === null || val === undefined) return true;
+  const str = String(val).trim();
+  if (str === "") return true;
+  const lower = str.toLowerCase();
+
+  // Detección estricta de #N/A y variantes de error de búsqueda no disponible
+  if (
+    lower.includes("#n/a") ||
+    lower.includes("#n/d") ||
+    lower === "#n/a" ||
+    lower === "n/a" ||
+    lower === "#n/d" ||
+    lower === "n/d"
+  ) {
+    return true;
+  }
+
+  // Detección de errores típicos de fórmulas rotas en Excel y Google Sheets
+  if (
+    lower.includes("#ref!") ||
+    lower.includes("#value!") ||
+    lower.includes("#valor!") ||
+    lower.includes("#name?") ||
+    lower.includes("#nombre?") ||
+    lower.includes("#div/0!") ||
+    lower.includes("#null!") ||
+    lower.includes("#num!") ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "nan"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Valida si un nombre de entidad (JCC, Supervisor, Agente) es válido y no roto.
+ */
+export function isValidEntityName(name: unknown): boolean {
+  if (name === null || name === undefined) return false;
+  const str = String(name).trim();
+  if (str === "" || str === "-" || str === "--") return false;
+  return !isInvalidOrBrokenValue(str);
+}
+
+/**
  * Expresión regular para detectar términos de baja, desvinculación o inactividad
  */
-export const BAJA_KEYWORDS_REGEX = /\b(baja|de\s*baja|baja\s*laboral|desvinculad[oa]s?|inactiv[oa]s?|egresad[oa]s?|egreso|desestimad[oa]s?|dado\s*de\s*baja|baja\s*definitiva|baja\s*medica|no\s*activo)\b/i;
+export const BAJA_KEYWORDS_REGEX = /\b(baja|de\s*baja|baja\s*laboral|desvinculad[oa]s?|inactiv[oa]s?|egresad[oa]s?|dado\s*de\s*baja|baja\s*definitiva|baja\s*medica)\b/i;
 
 /**
  * Valida de forma estricta si un registro, objeto o fila de datos corresponde
- * a un asesor dado de baja o pintado de rojo/rosado en la base de datos de origen.
+ * a un asesor dado de baja confirmada o pintado de rojo/rosado.
  */
 export function isBajaRecord(recordOrRow: any): boolean {
   if (!recordOrRow) return false;
@@ -116,22 +170,18 @@ export function isBajaRecord(recordOrRow: any): boolean {
         if (cell.isBaja === true || cell.baja === true) return true;
       }
 
-      const str = String(cell).trim();
-      if (!str) continue;
-
-      if (BAJA_KEYWORDS_REGEX.test(str)) {
-        return true;
-      }
-
-      // Celda con código o nombre de color rojo/rosado
-      if (isRedOrPinkColor(str)) {
-        return true;
+      // Si es un valor de texto explícito de estado de baja
+      if (typeof cell === "string") {
+        const str = cell.trim();
+        if (str && str.length <= 35 && BAJA_KEYWORDS_REGEX.test(str)) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  // 2. Validación de propiedades directas booleanas o flags
+  // 2. Validación de propiedades directas booleanas o flags de baja
   if (
     recordOrRow.isBaja === true ||
     recordOrRow.baja === true ||
@@ -163,40 +213,45 @@ export function isBajaRecord(recordOrRow: any): boolean {
     return true;
   }
 
-  // 4. Validación de campos textuales del registro
+  // 4. Validación de campos de situación laboral/baja (NO validar campos de texto general como nombres, notas o campañas)
   const fieldsToCheck = [
-    recordOrRow.status,
-    recordOrRow.estado,
-    recordOrRow.condicion,
-    recordOrRow.situacion,
     recordOrRow.estadoLaboral,
     recordOrRow.situacionLaboral,
-    recordOrRow.feedback,
-    recordOrRow.observaciones,
-    recordOrRow.observacion,
-    recordOrRow.notas,
-    recordOrRow.motivo,
-    recordOrRow.detalles,
-    recordOrRow.agentName,
-    recordOrRow.name,
-    recordOrRow.campaign,
-    recordOrRow.supervisor,
+    recordOrRow.situacion,
+    recordOrRow.condicionLaboral,
+    recordOrRow.motivoBaja,
   ];
 
   for (const field of fieldsToCheck) {
     if (typeof field === "string" && field.trim()) {
-      if (BAJA_KEYWORDS_REGEX.test(field)) {
+      if (BAJA_KEYWORDS_REGEX.test(field.trim())) {
         return true;
       }
     }
   }
 
-  // 5. Si tiene celdas crudas asociadas
+  // Si el campo status explícitamente dice 'Baja' o 'Inactivo' (no confundir con Aprobado, No Aprobado o Pendiente)
+  if (typeof recordOrRow.status === "string") {
+    const s = recordOrRow.status.trim().toLowerCase();
+    if (s === "baja" || s === "inactivo" || s === "desvinculado") {
+      return true;
+    }
+  }
+
+  // 5. Si tiene celdas crudas asociadas con estilos de color
   if (recordOrRow._rawCells && Array.isArray(recordOrRow._rawCells)) {
     if (isBajaRecord(recordOrRow._rawCells)) return true;
   }
 
   return false;
+}
+
+/**
+ * Valida si un registro corresponde a una baja confirmada.
+ */
+export function isBrokenOrBajaRecord(recordOrRow: any): boolean {
+  if (!recordOrRow) return true;
+  return isBajaRecord(recordOrRow);
 }
 
 /**

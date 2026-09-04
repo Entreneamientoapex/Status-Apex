@@ -296,6 +296,7 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
       // Base matching agents for this test under current Supervisor / JCC & Search criteria (before status tab)
       const baseSupervisorAgents = rawList.filter((r) => {
+        if (isBajaRecord(r)) return false;
         if (selectedSupervisor) {
           const supLower = selectedSupervisor.trim().toLowerCase();
           const rawSup = r.supervisor?.trim();

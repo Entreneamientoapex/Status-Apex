@@ -19,8 +19,7 @@ export const DEFAULT_PASSING_SCORE = 80;
 // Si la planilla tiene pestañas con nombres de tests, la app las detectará automáticamente.
 // Puedes agregar aquí los nombres de tus hojas como referencia inicial:
 export const KNOWN_SHEET_TABS = [
-  "CD2633 Genesys Cloud - 19/08/2026",
-  "Capacitación Calidad Ventas - 18/08/2026",
-  "Onboarding Atención al Cliente - 15/08/2026",
-  "Resolución en Primer Contacto (FCR) - 10/08/2026"
+  "CD2633  Genesys Cloud (para representantes)",
+  "CD2641 | Genesys Cloud (para supervisores)",
+  "CD2633 Genesys Cloud"
 ];
