@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Briefcase, ChevronRight, Check, Search, X, Users } from "lucide-react";
 import { AgentRecord } from "../types";
 import { SheetAnalysisRecord } from "../utils/googleSheetsService";
-import { isAgentEvaluated, getDynamicTabAcronym } from "./SupervisorCard";
+import { isAgentEvaluated, getDynamicTabAcronym, getAgentUniqueKey } from "./SupervisorCard";
 import {
   isBajaRecord,
   isValidEntityName,
@@ -181,14 +181,17 @@ export const JCCCard: React.FC<JCCCardProps> = ({
       .filter((data) => data.total > 0)
       .map((data) => {
         const uniqueSupervisors = new Set<string>();
-        const uniqueAgents = new Set<string>();
+        const agentMap = new Map<string, AgentRecord[]>();
 
         data.agents.forEach((r) => {
           if (isBajaRecord(r)) return;
 
-          const agentKey = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim() || "").toLowerCase();
+          const agentKey = getAgentUniqueKey(r);
           if (agentKey) {
-            uniqueAgents.add(agentKey);
+            if (!agentMap.has(agentKey)) {
+              agentMap.set(agentKey, []);
+            }
+            agentMap.get(agentKey)!.push(r);
           }
 
           const rawSup = r.supervisor?.trim();
@@ -205,13 +208,44 @@ export const JCCCard: React.FC<JCCCardProps> = ({
         });
 
         const supervisorCount = uniqueSupervisors.size;
-        const staffCount = uniqueAgents.size > 0 ? uniqueAgents.size : data.total;
+        const staffCount = agentMap.size;
 
-        // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
-        const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
-        // Porcentaje de avance: asesores con nota real sobre el total de su universo
-        const porcentajeAvance =
-          data.total > 0 ? Math.round((rendidosActuales / data.total) * 100) : 0;
+        // Rendidos reales: Asesores ÚNICOS con al menos 1 evaluación registrada con nota
+        let uniqueEvaluatedCount = 0;
+        let uniqueApprovedCount = 0;
+        let uniqueFailedCount = 0;
+        let uniquePendingCount = 0;
+        let scoreSum = 0;
+        let scoredCount = 0;
+
+        agentMap.forEach((agentRecords) => {
+          const hasEvaluated = agentRecords.some(isAgentEvaluated);
+          if (hasEvaluated) {
+            uniqueEvaluatedCount++;
+            const hasApproved = agentRecords.some(
+              (r) => r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80)
+            );
+            if (hasApproved) {
+              uniqueApprovedCount++;
+            } else {
+              uniqueFailedCount++;
+            }
+
+            const validScores = agentRecords
+              .map((r) => r.score)
+              .filter((s): s is number => typeof s === "number" && !isNaN(s) && s >= 0);
+            if (validScores.length > 0) {
+              scoreSum += Math.max(...validScores);
+              scoredCount++;
+            }
+          } else {
+            uniquePendingCount++;
+          }
+        });
+
+        // Porcentaje de avance: asesores únicos con nota real sobre el universo total asignado al JCC
+        const rawPorcentaje = staffCount > 0 ? (uniqueEvaluatedCount / staffCount) * 100 : 0;
+        const porcentajeAvance = Math.min(100, Math.max(0, Math.round(rawPorcentaje)));
 
         // Formulate multi-test badge dinámico: "TT: 85% | TD: 90%"
         let multiTestBadge = "";
@@ -232,11 +266,21 @@ export const JCCCard: React.FC<JCCCardProps> = ({
                 return jccName.toLowerCase() === data.jcc.toLowerCase();
               });
 
-              // Asesores bajo este JCC que tienen nota real numérica en este test
-              const testRendidos = jccTestAgents.filter(isAgentEvaluated).length;
+              // Asesores bajo este JCC que tienen nota real numérica en este test (únicos)
+              const testUniqueEvaluated = new Set<string>();
+              jccTestAgents.forEach((r) => {
+                if (isAgentEvaluated(r)) {
+                  const key = getAgentUniqueKey(r);
+                  if (key) testUniqueEvaluated.add(key);
+                }
+              });
+
               // Universo total bajo este JCC
-              const jccUniverse = data.total > 0 ? data.total : jccTestAgents.length;
-              const testRate = jccUniverse > 0 ? Math.round((testRendidos / jccUniverse) * 100) : 0;
+              const jccUniverse = staffCount > 0 ? staffCount : jccTestAgents.length;
+              const testRate =
+                jccUniverse > 0
+                  ? Math.min(100, Math.max(0, Math.round((testUniqueEvaluated.size / jccUniverse) * 100)))
+                  : 0;
 
               return `${acronym}: ${testRate}%`;
             })
@@ -246,16 +290,15 @@ export const JCCCard: React.FC<JCCCardProps> = ({
         return {
           jcc: data.jcc,
           agents: data.agents,
-          total: data.total,
+          total: staffCount,
           supervisorCount,
           staffCount,
-          approved: data.approved,
-          failed: data.failed,
-          pending: data.pending,
+          approved: uniqueApprovedCount,
+          failed: uniqueFailedCount,
+          pending: uniquePendingCount,
           porcentajeAvance,
           multiTestBadge,
-          avgScore:
-            data.scoredCount > 0 ? Math.round(data.scoreSum / data.scoredCount) : 0,
+          avgScore: scoredCount > 0 ? Math.round(scoreSum / scoredCount) : 0,
         };
       })
       .sort((a, b) => a.jcc.localeCompare(b.jcc, "es", { sensitivity: "base" }));
@@ -404,17 +447,13 @@ export const JCCCard: React.FC<JCCCardProps> = ({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                        item.porcentajeAvance >= 80
-                          ? "bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1]"
-                          : item.porcentajeAvance >= 40
-                          ? "bg-[#FEF6E7] text-[#B76E00] border border-[#F6DCAC]"
-                          : "bg-[#FDECEB] text-[#C5221F] border border-[#F8C8C6]"
+                      className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap shadow-xs ${
+                        item.porcentajeAvance > 0 ? "bg-emerald-600" : "bg-red-600"
                       }`}
                     >
                       {isMultiTest && item.multiTestBadge
-                        ? item.multiTestBadge
-                        : `${item.porcentajeAvance}% rendido`}
+                        ? item.multiTestBadge.toUpperCase()
+                        : `${Math.min(100, Math.max(0, item.porcentajeAvance))}% RENDIDO`}
                     </span>
                     {onSelectJCC && (
                       <ChevronRight

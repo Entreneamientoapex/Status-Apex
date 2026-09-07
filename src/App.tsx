@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Navbar } from "./components/Navbar";
 import { StatsCards } from "./components/StatsCards"; // Metric cards component
 import { AgentTable } from "./components/AgentTable";
@@ -67,9 +67,15 @@ export default function App() {
   // Google Sheets Tabs & History State
   const [history, setHistory] = useState<SheetAnalysisRecord[]>([]);
   const [activeAnalysisId, setActiveAnalysisId] = useState<string | null>(null);
+  const activeAnalysisIdRef = useRef<string | null>(null);
+  const lastKnownSignatureRef = useRef<string | null>(null);
   const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [isLiveFromGoogle, setIsLiveFromGoogle] = useState(false);
   const [needsPermissionNotice, setNeedsPermissionNotice] = useState(false);
+
+  useEffect(() => {
+    activeAnalysisIdRef.current = activeAnalysisId;
+  }, [activeAnalysisId]);
 
   // Modals state
   const [isAIReportOpen, setIsAIReportOpen] = useState(false);
@@ -198,7 +204,8 @@ export default function App() {
       setNeedsPermissionNotice(false);
     }
 
-    let selected = sanitizedAnalyses.find((a) => a.id === activeAnalysisId);
+    const targetAnalysisId = activeAnalysisIdRef.current || activeAnalysisId;
+    let selected = sanitizedAnalyses.find((a) => a.id === targetAnalysisId);
     if (!selected && typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const paramTest = urlParams.get("test") || urlParams.get("tab");
@@ -226,6 +233,7 @@ export default function App() {
     }
 
     setActiveAnalysisId(selected.id);
+    activeAnalysisIdRef.current = selected.id;
     setRecords(selected.records);
     setCurrentBatch({
       id: selected.id,
@@ -295,8 +303,9 @@ export default function App() {
       const analyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
       if (analyses && analyses.length > 0) {
         // Obtener la firma/token Z1 actual para persistir en la nueva caché
-        const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL)) || String(Date.now());
+        const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL, activeAnalysisIdRef.current)) || String(Date.now());
         saveDashboardLocalCache(analyses, currentSig, GOOGLE_SHEET_URL);
+        lastKnownSignatureRef.current = currentSig;
         try {
           localStorage.setItem("apex_z1_token", currentSig);
         } catch {}
@@ -317,8 +326,9 @@ export default function App() {
   const handleManualSync = () => {
     clearDashboardLocalCache();
     try {
-      localStorage.clear();
+      localStorage.removeItem("apex_z1_token");
     } catch {}
+    lastKnownSignatureRef.current = null;
     loadGoogleSheetsData(true, true);
   };
 
@@ -326,82 +336,76 @@ export default function App() {
     // 1. Carga inicial al montar el componente
     loadGoogleSheetsData(false, false);
 
-    // 2. Centinela de Cambios en Segundo Plano por Token Z1 con Page Visibility API (10s)
-    const POLL_INTERVAL_MS = 10000;
-    let sentinelInterval: ReturnType<typeof setInterval> | null = null;
+    // 2. Centinela Activo con temporizador cíclico de exactamente 10 segundos (10000 ms)
+    const SENTINEL_INTERVAL_MS = 10000;
+    let isChecking = false;
 
-    const checkZ1Token = async () => {
+    const runSentinelCheck = async () => {
+      if (isChecking) return;
+      isChecking = true;
+
       try {
-        // Petición ultra-liviana meta-fetch exclusivamente del token puro de la celda Z1 al endpoint doGet de Apps Script
-        const currentToken = await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
-        const cached = getDashboardLocalCache(GOOGLE_SHEET_URL);
-        const savedToken = (typeof window !== "undefined" ? localStorage.getItem("apex_z1_token") : null) || cached?.versionSig;
+        // Petición asíncrona a la API de Google Sheets consultando firma/marca de tiempo de última modificación
+        const currentTab = activeAnalysisIdRef.current;
+        const remoteSig = await fetchSheetLastModifiedSignature(
+          GOOGLE_SHEET_URL,
+          APPS_SCRIPT_URL,
+          currentTab
+        );
 
-        if (currentToken) {
-          if (!savedToken || currentToken !== savedToken) {
-            // El número de la celda Z1 en el Excel es DIFERENTE al guardado en la PC del usuario:
-            console.log(
-              `🔄 [Centinela Z1] Cambio de token detectado en Excel Z1 (Remoto: "${currentToken}" vs Local: "${savedToken}"). Limpiando caché y actualizando en vivo...`
-            );
-            // 1. Limpieza inmediata de caché local
-            clearDashboardLocalCache();
-            try {
-              localStorage.clear();
-            } catch {}
-            // 2. Sincronización en vivo del JSON principal para refrescar tarjetas visuales al instante
-            await loadGoogleSheetsData(false, true);
-          } else {
-            // El número de la celda Z1 NO cambió: mantener LocalStorage intacto (0 bytes transferidos)
-            console.log(`🛡️ [Centinela Z1] Token Z1 sin cambios ("${currentToken}"). LocalStorage intacto (0 bytes transferidos).`);
+        if (!remoteSig) return;
+
+        const cached = getDashboardLocalCache(GOOGLE_SHEET_URL);
+        const localSig =
+          lastKnownSignatureRef.current ||
+          (typeof window !== "undefined" ? localStorage.getItem("apex_z1_token") : null) ||
+          cached?.versionSig;
+
+        // Primera sincronización del token local si no existía previamente
+        if (!localSig) {
+          lastKnownSignatureRef.current = remoteSig;
+          try {
+            localStorage.setItem("apex_z1_token", remoteSig);
+          } catch {}
+          return;
+        }
+
+        // Comparación estricta: estado actual vs respuesta remota de Google Sheets
+        if (remoteSig !== localSig) {
+          console.log(
+            `🔄 [Centinela 10s] Modificación detectada en Google Sheets (Remoto: "${remoteSig}" vs Local: "${localSig}"). Sincronizando dashboard en tiempo real...`
+          );
+
+          // Actualizar referencia del token
+          lastKnownSignatureRef.current = remoteSig;
+          try {
+            localStorage.setItem("apex_z1_token", remoteSig);
+          } catch {}
+
+          // Disparar automáticamente la recarga y renderizado en vivo para actualizar tarjetas métricas y listas sin recargar la página
+          const freshAnalyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
+          if (freshAnalyses && freshAnalyses.length > 0) {
+            saveDashboardLocalCache(freshAnalyses, remoteSig, GOOGLE_SHEET_URL);
+            applyAnalysesToDashboard(freshAnalyses, false, false);
+            console.log(`✅ [Centinela 10s] Sincronización en vivo completada con éxito (${freshAnalyses.length} evaluaciones).`);
           }
+        } else {
+          console.log(`🛡️ [Centinela 10s] Google Sheet verificado sin cambios (firma: "${remoteSig}"). Dashboard sincronizado.`);
         }
       } catch (err) {
-        console.warn("⚠️ [Centinela Z1] Error en chequeo de token Z1:", err);
+        console.warn("⚠️ [Centinela 10s] Error durante la consulta de verificación:", err);
+      } finally {
+        isChecking = false;
       }
     };
 
-    const startSentinel = () => {
-      if (!sentinelInterval) {
-        // Ejecución inmediata al volver a la pestaña
-        checkZ1Token();
-        sentinelInterval = setInterval(checkZ1Token, POLL_INTERVAL_MS);
-      }
-    };
+    console.log("⏱️ [Centinela Activo] Temporizador cíclico de 10 segundos (10000ms) inicializado.");
+    const sentinelInterval = setInterval(runSentinelCheck, SENTINEL_INTERVAL_MS);
 
-    const stopSentinel = () => {
-      if (sentinelInterval) {
-        clearInterval(sentinelInterval);
-        sentinelInterval = null;
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (typeof document !== "undefined" && document.hidden) {
-        // Usuario cambió de pestaña, minimizó o bloqueó la pantalla: consumo de red = 0
-        console.log("⏸️ [Centinela Z1] Pestaña oculta (document.hidden = true). Centinela detenido, consumo de red en 0.");
-        stopSentinel();
-      } else {
-        // Usuario regresó a la pestaña: reactivación inmediata y revisión en caliente
-        console.log("▶️ [Centinela Z1] Pestaña visible (document.hidden = false). Centinela reactivado, verificando cambios...");
-        startSentinel();
-      }
-    };
-
-    // Iniciar centinela si la pestaña está visible al inicio
-    if (typeof document !== "undefined" && !document.hidden) {
-      startSentinel();
-    }
-
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-    }
-
-    // Limpieza de intervalo y detector de eventos al desmontar el componente
+    // 3. Limpieza y Optimización: limpiar intervalo (clearInterval) al desmontar el componente
     return () => {
-      stopSentinel();
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
-      }
+      console.log("🛑 [Centinela] Limpieza de intervalo clearInterval al desmontar el componente.");
+      clearInterval(sentinelInterval);
     };
   }, []);
 

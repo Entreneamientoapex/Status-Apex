@@ -70,28 +70,67 @@ export interface ApexDashboardCacheData {
  */
 export async function fetchSheetLastModifiedSignature(
   spreadsheetUrl: string = GOOGLE_SHEET_URL,
-  appsScriptUrl: string = APPS_SCRIPT_URL
+  appsScriptUrl: string = APPS_SCRIPT_URL,
+  tabName?: string | null
 ): Promise<string | null> {
-  // 1. PRIORIDAD: Consulta ultra-liviana a Apps Script con destructor de caché de red
+  const sheetId = extractSpreadsheetId(spreadsheetUrl);
+  if (!sheetId) return null;
+
+  // 1. PRIORIDAD: Google Visualization API ultra-rápida (rango A1, headers=0, timestamp anti-caché)
+  // Devuelve la firma de revisión "sig" recalculada al instante por Google ante cualquier cambio en la planilla
+  try {
+    const tabParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : "";
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${encodeURIComponent("select A limit 1")}&headers=0${tabParam}&_t=${Date.now()}`;
+    const res = await fetch(gvizUrl, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
+    if (res.ok) {
+      const text = await res.text();
+      const sigMatch = text.match(/"sig":\s*"([^"]+)"/i) || text.match(/"version":\s*"([^"]+)"/i);
+      const etagHeader = res.headers.get("etag");
+      const lastModifiedHeader = res.headers.get("last-modified");
+
+      const sigValue = sigMatch ? sigMatch[1] : "";
+      if (sigValue) {
+        return `sig_${sigValue}`;
+      }
+      if (etagHeader || lastModifiedHeader) {
+        return `head_${etagHeader || ""}_${lastModifiedHeader || ""}`;
+      }
+      if (text.length > 0 && text.length < 5000) {
+        return `hash_${computeSHA256Sync(text).substring(0, 16)}`;
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [Centinela] Verificación rápida GViz:", err);
+  }
+
+  // 2. Consulta a Apps Script con timeout de 3 segundos
   if (appsScriptUrl) {
     try {
       const sep = appsScriptUrl.includes("?") ? "&" : "?";
       const checkUrl = `${appsScriptUrl}${sep}checkUpdate=true&cache=${Date.now()}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       const res = await fetch(checkUrl, {
         cache: "no-store",
+        signal: controller.signal,
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
         },
-        redirect: "follow",
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const text = (await res.text()).trim();
         if (text && !text.includes("<!DOCTYPE html>") && !text.includes("accounts.google.com")) {
-          let tokenValue: string | number | null = null;
           try {
             const data = JSON.parse(text);
-            tokenValue =
+            const tokenValue =
               data.z1 ??
               data.token ??
               data.lastModified ??
@@ -102,68 +141,33 @@ export async function fetchSheetLastModifiedSignature(
               data.lastUpdate ??
               data.sig ??
               data.val ??
-              (typeof data === "number" || typeof data === "string" ? data : null);
+              (Array.isArray(data.sheets) ? data.sheets.map((s: any) => s.name).join("|") : null);
+            if (tokenValue) return `as_${tokenValue}`;
           } catch {
-            // El script devolvió el número de fecha/timestamp puro de la celda Z1 directamente en texto plano
-            tokenValue = text;
-          }
-
-          if (tokenValue !== null && tokenValue !== undefined && tokenValue !== "") {
-            const cleanToken = String(tokenValue).trim();
-            return cleanToken;
+            return `as_${text}`;
           }
         }
       }
-    } catch (err) {
-      console.warn("⚠️ [Cache Centinela] No se pudo verificar la firma via Apps Script doGet:", err);
+    } catch {
+      // Ignorar timeout silenciosamente
     }
-  }
-
-  // 2. Fallback ultra-liviano a Google Visualization API solicitando solo 1 celda (A1)
-  const sheetId = extractSpreadsheetId(spreadsheetUrl);
-  if (!sheetId) return null;
-
-  try {
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${encodeURIComponent("select A limit 1")}&headers=0`;
-    const res = await fetch(gvizUrl, { cache: "no-store" });
-    if (res.ok) {
-      const text = await res.text();
-      // Google GViz response contiene "sig":"<HASH_SIGNATURE>" o "version":"..." representando el estado de modificación
-      const sigMatch = text.match(/"sig":\s*"([^"]+)"/i) || text.match(/"version":\s*"([^"]+)"/i);
-      const etagHeader = res.headers.get("etag");
-      const lastModifiedHeader = res.headers.get("last-modified");
-
-      const sigValue = sigMatch ? sigMatch[1] : "";
-      if (sigValue) {
-        return `sig_${sigValue}`;
-      }
-      if (etagHeader || lastModifiedHeader) {
-        return `header_${etagHeader || ""}_${lastModifiedHeader || ""}`;
-      }
-
-      if (text.length > 0 && text.length < 5000) {
-        return `hash_${computeSHA256Sync(text).substring(0, 16)}`;
-      }
-    }
-  } catch (err) {
-    console.warn("⚠️ [Cache] Fallback de verificación liviana GViz:", err);
   }
 
   // 3. Fallback ultra-liviano a export CSV de rango A1
   try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&range=A1:A1`;
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&range=A1:A1&_t=${Date.now()}`;
     const headRes = await fetch(csvUrl, { cache: "no-store" });
     if (headRes.ok) {
       const etag = headRes.headers.get("etag");
       const lastMod = headRes.headers.get("last-modified");
       if (etag || lastMod) {
-        return `head_${etag || ""}_${lastMod || ""}`;
+        return `csv_head_${etag || ""}_${lastMod || ""}`;
       }
       const txt = await headRes.text();
       return `csv_${computeSHA256Sync(txt).substring(0, 16)}`;
     }
   } catch (err) {
-    console.warn("⚠️ [Cache] Fallback de verificación liviana CSV:", err);
+    console.warn("⚠️ [Centinela] Fallback CSV:", err);
   }
 
   return null;

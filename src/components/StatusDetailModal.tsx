@@ -114,6 +114,8 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
   // Status configuration details
   const config = {
     Aprobado: {
+      titlePrefix: "Agentes",
+      titleHighlight: "Aprobados",
       title: "Agentes Aprobados",
       subtitle: "Asesores que alcanzaron o superaron los 80 pts en la evaluación principal o en recuperatorio (Col. V/W)",
       badgeBg: "bg-[#E6F3E6]",
@@ -124,6 +126,8 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
       cardBorder: "border-[#C6DEC6]",
     },
     "No Aprobado": {
+      titlePrefix: "Agentes",
+      titleHighlight: "No Aprobados",
       title: "Agentes No Aprobados",
       subtitle: "Asesores con calificación menor a 80 pts en todas las instancias evaluadas que requieren refuerzo",
       badgeBg: "bg-[#FDF1F1]",
@@ -134,7 +138,9 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
       cardBorder: "border-[#F0D5D5]",
     },
     Pendiente: {
-      title: "Agentes Pendientes de Evaluación",
+      titlePrefix: "Evaluaciones",
+      titleHighlight: "Pendientes",
+      title: "Evaluaciones Pendientes",
       subtitle: "Asesores de la nómina que aún no cuentan con registro de examen en la planilla del curso",
       badgeBg: "bg-[#FAF5E6]",
       badgeText: "text-[#8C733E]",
@@ -144,6 +150,8 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
       cardBorder: "border-[#EBDDBF]",
     },
     ALL: {
+      titlePrefix: "Total de",
+      titleHighlight: "Agentes",
       title: "Total de Agentes Coincidentes",
       subtitle: "Nómina completa de agentes que forman parte del subconjunto de IDs filtrado",
       badgeBg: "bg-[#F1F3EE]",
@@ -154,6 +162,8 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
       cardBorder: "border-[#D9DED4]",
     },
   }[status] || {
+    titlePrefix: "Agentes",
+    titleHighlight: `(${status})`,
     title: `Agentes (${status})`,
     subtitle: "Lista filtrada por estado",
     badgeBg: "bg-[#F1F3EE]",
@@ -181,9 +191,10 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
               <IconComponent className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold text-[#2D332A] tracking-tight">
-                  {config.title}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h2 className="text-xl sm:text-2xl font-['Montserrat'] font-sans font-extrabold tracking-tight text-slate-800">
+                  {config.titlePrefix}{" "}
+                  <span className="text-cyan-600">{config.titleHighlight}</span>
                 </h2>
                 <span
                   className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${config.badgeBg} ${config.badgeText} ${config.badgeBorder}`}
@@ -197,7 +208,7 @@ export const StatusDetailModal: React.FC<StatusDetailModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-[#6B7366] mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
                 {config.subtitle}
               </p>
             </div>

@@ -40,6 +40,39 @@ export function isAgentEvaluated(agent: AgentRecord): boolean {
 }
 
 /**
+ * Obtiene la clave única representativa de un asesor para deduplicar registros múltiples
+ */
+export function getAgentUniqueKey(r: AgentRecord): string {
+  const cleanId = (r.agentId || "").trim().toLowerCase();
+  if (
+    cleanId &&
+    cleanId !== "-" &&
+    cleanId !== "sin legajo" &&
+    cleanId !== "sin id" &&
+    !cleanId.includes("#n/a")
+  ) {
+    return `id_${cleanId}`;
+  }
+
+  const cleanName = (r.agentName || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (
+    cleanName &&
+    cleanName !== "-" &&
+    cleanName !== "sin nombre" &&
+    !cleanName.includes("#n/a")
+  ) {
+    return `name_${cleanName}`;
+  }
+
+  return `rec_${(r.id || "").trim().toLowerCase()}`;
+}
+
+/**
  * Genera dinámicamente las siglas o iniciales representativas de cada pestaña del Excel
  */
 export function getDynamicTabAcronym(name: string | undefined | null, index: number): string {
@@ -173,19 +206,13 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
     return false;
   }, [history, selectedTestIds, activeAnalysisId, records, activeEvaluations]);
 
-  // Group agents by supervisor and calculate metrics
+  // Group agents by supervisor and calculate metrics using STRICT UNIQUE advisor counting
   const supervisorStats = useMemo(() => {
     const map = new Map<
       string,
       {
         supervisor: string;
         agents: AgentRecord[];
-        total: number;
-        approved: number;
-        failed: number;
-        pending: number;
-        scoreSum: number;
-        scoredCount: number;
       }
     >();
 
@@ -209,50 +236,75 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
         map.set(supName, {
           supervisor: supName,
           agents: [],
-          total: 0,
-          approved: 0,
-          failed: 0,
-          pending: 0,
-          scoreSum: 0,
-          scoredCount: 0,
         });
       }
-      const data = map.get(supName)!;
-      data.agents.push(r);
-      data.total++;
-
-      const isEvaluated = isAgentEvaluated(r);
-      const isAppr = r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80);
-      const isFail = r.status === "No Aprobado" || (typeof r.score === "number" && r.score < 80 && r.score >= 0);
-
-      if (isAppr) data.approved++;
-      else if (isFail) data.failed++;
-      else data.pending++;
-
-      if (typeof r.score === "number" && !isNaN(r.score) && isEvaluated) {
-        data.scoreSum += r.score;
-        data.scoredCount++;
-      }
+      map.get(supName)!.agents.push(r);
     });
 
     return Array.from(map.values())
-      .filter((data) => data.total > 0)
       .map((data) => {
-        const uniqueAgents = new Set<string>();
+        // 1. Agrupar los registros por asesor ÚNICO para evitar contar filas o exámenes duplicados
+        const agentMap = new Map<string, AgentRecord[]>();
+
         data.agents.forEach((r) => {
           if (isBajaRecord(r)) return;
-          const agentKey = (r.agentId?.trim() || r.agentName?.trim() || r.id?.trim() || "").toLowerCase();
-          if (agentKey) {
-            uniqueAgents.add(agentKey);
+          const key = getAgentUniqueKey(r);
+          if (key) {
+            if (!agentMap.has(key)) {
+              agentMap.set(key, []);
+            }
+            agentMap.get(key)!.push(r);
           }
         });
-        const teamTotal = uniqueAgents.size > 0 ? uniqueAgents.size : data.total;
 
-        // Rendidos reales en la vista actual (excluyendo notas vacías o pendientes)
-        const rendidosActuales = data.agents.filter(isAgentEvaluated).length;
-        // Porcentaje de avance: asesores con nota real sobre el universo total de su equipo
-        const porcentajeAvance =
-          teamTotal > 0 ? Math.round((rendidosActuales / teamTotal) * 100) : 0;
+        // Total de asesores únicos asignados al supervisor
+        const totalAsesores = agentMap.size;
+
+        // 2. Contar asesores únicos que ya tienen al menos 1 evaluación registrada con nota
+        let uniqueEvaluatedCount = 0;
+        let uniqueApprovedCount = 0;
+        let uniqueFailedCount = 0;
+        let uniquePendingCount = 0;
+        let scoreSum = 0;
+        let scoredCount = 0;
+
+        agentMap.forEach((agentRecords) => {
+          // ¿Tiene al menos 1 evaluación registrada válida (con nota real)?
+          const hasEvaluated = agentRecords.some(isAgentEvaluated);
+
+          if (hasEvaluated) {
+            uniqueEvaluatedCount++;
+
+            // Condición de aprobación: si en alguna de sus evaluaciones aprobó o tiene score >= 80
+            const hasApproved = agentRecords.some(
+              (r) => r.status === "Aprobado" || (typeof r.score === "number" && r.score >= 80)
+            );
+
+            if (hasApproved) {
+              uniqueApprovedCount++;
+            } else {
+              uniqueFailedCount++;
+            }
+
+            // Para el promedio: tomar la nota más alta / recuperatorio del asesor
+            const validScores = agentRecords
+              .map((r) => r.score)
+              .filter((s): s is number => typeof s === "number" && !isNaN(s) && s >= 0);
+
+            if (validScores.length > 0) {
+              scoreSum += Math.max(...validScores);
+              scoredCount++;
+            }
+          } else {
+            uniquePendingCount++;
+          }
+        });
+
+        // 3. Fórmula matemática estricta:
+        // Porcentaje_Rendido = (Cantidad de asesores únicos con al menos 1 evaluación registrada / Total de asesores asignados al supervisor) * 100
+        const rawPorcentaje = totalAsesores > 0 ? (uniqueEvaluatedCount / totalAsesores) * 100 : 0;
+        // Límite visual de seguridad: redondear al número entero más cercano y forzar un tope de 100%
+        const porcentajeAvance = Math.min(100, Math.max(0, Math.round(rawPorcentaje)));
 
         // Formulate multi-test badge dinámico: "TT: 85% | TD: 90%"
         let multiTestBadge = "";
@@ -268,6 +320,7 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                 const rawSup = r.supervisor?.trim();
                 const supName =
                   !rawSup ||
+                  rawSup === "" ||
                   rawSup === "-" ||
                   rawSup.toLowerCase() === "sin supervisor asignado" ||
                   rawSup.toLowerCase() === "sin supervisor" ||
@@ -278,11 +331,21 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
                 return supName.toLowerCase() === data.supervisor.toLowerCase();
               });
 
-              // Asesores de su equipo que tienen nota numérica real en este test
-              const testRendidos = supervisorTestAgents.filter(isAgentEvaluated).length;
-              // Universo total de su equipo
-              const teamUniverse = teamTotal > 0 ? teamTotal : supervisorTestAgents.length;
-              const testRate = teamUniverse > 0 ? Math.round((testRendidos / teamUniverse) * 100) : 0;
+              // Asesores ÚNICOS con al menos 1 evaluación registrada en este test específico
+              const testUniqueEvaluated = new Set<string>();
+              supervisorTestAgents.forEach((r) => {
+                if (isAgentEvaluated(r)) {
+                  const key = getAgentUniqueKey(r);
+                  if (key) testUniqueEvaluated.add(key);
+                }
+              });
+
+              // Universo total de asesores asignados al supervisor
+              const teamUniverse = totalAsesores > 0 ? totalAsesores : supervisorTestAgents.length;
+              const testRate =
+                teamUniverse > 0
+                  ? Math.min(100, Math.max(0, Math.round((testUniqueEvaluated.size / teamUniverse) * 100)))
+                  : 0;
 
               return `${acronym}: ${testRate}%`;
             })
@@ -292,15 +355,16 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
         return {
           supervisor: data.supervisor,
           agents: data.agents,
-          total: teamTotal,
-          approved: data.approved,
-          failed: data.failed,
-          pending: data.pending,
+          total: totalAsesores,
+          approved: uniqueApprovedCount,
+          failed: uniqueFailedCount,
+          pending: uniquePendingCount,
           porcentajeAvance,
           multiTestBadge,
-          avgScore: data.scoredCount > 0 ? Math.round(data.scoreSum / data.scoredCount) : 0,
+          avgScore: scoredCount > 0 ? Math.round(scoreSum / scoredCount) : 0,
         };
       })
+      .filter((item) => item.total > 0)
       .sort((a, b) => a.supervisor.localeCompare(b.supervisor, "es", { sensitivity: "base" }));
   }, [records, activeEvaluations]);
 
@@ -446,17 +510,13 @@ export const SupervisorCard: React.FC<SupervisorCardProps> = ({
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                      item.porcentajeAvance >= 80
-                        ? "bg-[#EAF5EC] text-[#1E7E34] border border-[#CCE8D1]"
-                        : item.porcentajeAvance >= 40
-                        ? "bg-[#FEF6E7] text-[#B76E00] border border-[#F6DCAC]"
-                        : "bg-[#FDECEB] text-[#C5221F] border border-[#F8C8C6]"
+                    className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap shadow-xs ${
+                      item.porcentajeAvance > 0 ? "bg-emerald-600" : "bg-red-600"
                     }`}
                   >
                     {isMultiTest && item.multiTestBadge
-                      ? item.multiTestBadge
-                      : `${item.porcentajeAvance}% rendido`}
+                      ? item.multiTestBadge.toUpperCase()
+                      : `${Math.min(100, Math.max(0, item.porcentajeAvance))}% RENDIDO`}
                   </span>
                   {onSelectSupervisor && (
                     <ChevronRight
