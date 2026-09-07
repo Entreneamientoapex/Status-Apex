@@ -891,9 +891,22 @@ export const AgentTable: React.FC<AgentTableProps> = ({
 
                             <div className="flex items-center gap-3">
                               <div className="text-right text-xs">
-                                <span className="font-extrabold text-slate-800">
-                                  {agent.score !== null ? `${agent.score}/80` : "Sin nota"}
-                                </span>
+                                {agent.score !== null && !isNaN(agent.score) ? (
+                                  <div className="flex items-baseline justify-end gap-1 font-mono">
+                                    <span
+                                      className={`font-bold text-sm ${
+                                        agent.score >= (agent.minPassingScore || 80)
+                                          ? "text-emerald-700"
+                                          : "text-red-700"
+                                      }`}
+                                    >
+                                      {agent.score}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-slate-400">/100</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic text-xs">Sin nota</span>
+                                )}
                               </div>
                               <span
                                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-sans font-black uppercase shadow-sm text-white ${
@@ -1209,18 +1222,18 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                               <td className="p-3.5 sm:p-4">
                                 {agent.score !== null && !isNaN(agent.score) ? (
                                   <div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-baseline gap-1">
                                       <span
-                                        className={`font-extrabold text-sm sm:text-base font-mono ${
+                                        className={`font-mono font-bold text-sm sm:text-base ${
                                           agent.score >= (agent.minPassingScore || 80)
-                                            ? "text-[#4F7A4F]"
-                                            : "text-[#9E4A4A]"
+                                            ? "text-[#2D6A4F] font-extrabold"
+                                            : "text-[#9E4A4A] font-extrabold"
                                         }`}
                                       >
                                         {agent.score}
                                       </span>
-                                      <span className="text-xs text-slate-500 font-bold">
-                                        /{agent.minPassingScore || 80}
+                                      <span className="text-xs font-medium text-slate-400">
+                                        /100
                                       </span>
                                     </div>
                                     {agent.passedInRetake && (
