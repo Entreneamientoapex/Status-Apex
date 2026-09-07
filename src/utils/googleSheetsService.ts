@@ -76,34 +76,50 @@ export async function fetchSheetLastModifiedSignature(
   const sheetId = extractSpreadsheetId(spreadsheetUrl);
   if (!sheetId) return null;
 
-  // 1. PRIORIDAD: Google Visualization API ultra-rápida (rango A1, headers=0, timestamp anti-caché)
-  // Devuelve la firma de revisión "sig" recalculada al instante por Google ante cualquier cambio en la planilla
+  // 1. PRIORIDAD: Google Visualization API ultra-rápida en paralelo sobre las pestañas activas y la nómina
+  // Devuelve la firma de revisión "sig" recalculada al instante por Google ante cualquier cambio en filas, notas o supervisores
   try {
-    const tabParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : "";
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${encodeURIComponent("select A limit 1")}&headers=0${tabParam}&_t=${Date.now()}`;
-    const res = await fetch(gvizUrl, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-      },
-    });
-    if (res.ok) {
-      const text = await res.text();
-      const sigMatch = text.match(/"sig":\s*"([^"]+)"/i) || text.match(/"version":\s*"([^"]+)"/i);
-      const etagHeader = res.headers.get("etag");
-      const lastModifiedHeader = res.headers.get("last-modified");
+    const tabsToCheck: string[] = ["Lista_agentes"];
+    if (tabName && !tabName.startsWith("tab_") && !tabsToCheck.includes(tabName)) {
+      tabsToCheck.push(tabName);
+    }
+    for (const known of KNOWN_SHEET_TABS) {
+      if (!tabsToCheck.includes(known)) {
+        tabsToCheck.push(known);
+      }
+    }
 
-      const sigValue = sigMatch ? sigMatch[1] : "";
-      if (sigValue) {
-        return `sig_${sigValue}`;
+    const sigPromises = tabsToCheck.map(async (tName) => {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0&sheet=${encodeURIComponent(tName)}&_t=${Date.now()}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(url, {
+          cache: "no-store",
+          signal: controller.signal,
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const text = await res.text();
+          const match = text.match(/"sig":\s*"([^"]+)"/i) || text.match(/"version":\s*"([^"]+)"/i);
+          if (match && match[1]) {
+            return `${tName}:${match[1]}`;
+          }
+        }
+      } catch {
+        // Ignorar error por pestaña
       }
-      if (etagHeader || lastModifiedHeader) {
-        return `head_${etagHeader || ""}_${lastModifiedHeader || ""}`;
-      }
-      if (text.length > 0 && text.length < 5000) {
-        return `hash_${computeSHA256Sync(text).substring(0, 16)}`;
-      }
+      return null;
+    });
+
+    const results = await Promise.all(sigPromises);
+    const validSigs = results.filter((s): s is string => Boolean(s));
+    if (validSigs.length > 0) {
+      return `sig_${validSigs.join("|")}`;
     }
   } catch (err) {
     console.warn("⚠️ [Centinela] Verificación rápida GViz:", err);
@@ -140,8 +156,7 @@ export async function fetchSheetLastModifiedSignature(
               data.version ??
               data.lastUpdate ??
               data.sig ??
-              data.val ??
-              (Array.isArray(data.sheets) ? data.sheets.map((s: any) => s.name).join("|") : null);
+              data.val;
             if (tokenValue) return `as_${tokenValue}`;
           } catch {
             return `as_${text}`;
@@ -1723,25 +1738,21 @@ export async function fetchUnifiedFromAppsScript(
 }
 
 /**
- * 4. FUNCIÓN MAESTRA CON REGLAS DE SEGURIDAD & ESTADOS CENTRALIZADOS:
- *    - Primero intenta el endpoint compacto unificado de Google Apps Script doGet.
- *    - Si no está disponible, realiza el parsing directo de Google Sheets.
- *    - Cruza estrictamente cada test contra la base maestra.
+ * 4. FUNCIÓN MAESTRA CON REGLAS DE SEGURIDAD & CRUCE INTEGRAL DE DATOS (DATA MERGING):
+ *    - Descarga nómina de agentes activa desde Lista_agentes con Supervisores ("Sup"), JCCs y campañas.
+ *    - Descarga las pestañas de test activas.
+ *    - Cruza cada registro contra la base maestra descartando agentes no existentes o dados de baja.
+ *    - Calcula aprobados, no aprobados, pendientes y promedios con filtrado de notas.
+ *    - Asigna las marcas de tiempo actualizadas de la sincronización en vivo.
  */
-export async function fetchAllSheetAnalyses(
+export async function executeFullDataMergeSync(
   spreadsheetUrl: string = GOOGLE_SHEET_URL,
-  appsScriptUrl: string = APPS_SCRIPT_URL
+  appsScriptUrl: string = APPS_SCRIPT_URL,
+  syncTimestamp?: string
 ): Promise<SheetAnalysisRecord[]> {
-  // 1. Prioridad: Consulta al endpoint unificado de doGet en Apps Script (JSON compacto)
-  const unifiedFromScript = await fetchUnifiedFromAppsScript(appsScriptUrl);
-  if (unifiedFromScript && unifiedFromScript.length > 0) {
-    return unifiedFromScript;
-  }
-
-  // 2. Fallback de alta resiliencia: Consulta y cruce directo sobre Google Sheets
-  console.log("ℹ️ [Fallback Sheet] Ejecutando sincronización directa con Google Sheets CSV/GViz...");
+  console.log("ℹ️ [Data Merging] Ejecutando cruce integral de datos con Google Sheets CSV/GViz...");
   
-  // Obtener el universo único y fijo de 261 asesores desde Lista_agentes
+  // Obtener el universo único y fijo de asesores desde Lista_agentes con supervisores asignados y JCCs
   const masterAgents = await fetchMasterAgentList(spreadsheetUrl);
 
   // Detectar dinámicamente todas las pestañas de test (filtrando Lista_agentes y Config_Usuarios)
@@ -1751,10 +1762,12 @@ export async function fetchAllSheetAnalyses(
   const testConfigMeta = await fetchTestConfigMetadata(spreadsheetUrl);
   const { statusMap: testStatusesMap, timestampMap: testTimestampsMap } = testConfigMeta;
 
+  const currentFormattedTime = syncTimestamp || formatTabTimestamp(new Date());
   const results: SheetAnalysisRecord[] = [];
 
   for (const tab of testTabs) {
     try {
+      // Cruce de datos: asignación de supervisores ("Sup"), notas, aprobados/no aprobados/pendientes
       const record = await fetchAndJoinTestAnalysis(tab, masterAgents, spreadsheetUrl);
       
       // Asociar código del proyecto y estado centralizado desde Config_Usuarios
@@ -1770,26 +1783,26 @@ export async function fetchAllSheetAnalyses(
         testStatus = "No Activo";
       }
 
-      // Asimilar marca de tiempo particular provista desde Config_Usuarios (si existe)
+      // Asimilar marca de tiempo particular provista desde Config_Usuarios (si existe) o timestamp de modificación en vivo
       const tabSpecificTimestamp =
         (projectCode && testTimestampsMap[projectCode]) ||
         (cleanTabName && testTimestampsMap[cleanTabName]) ||
         testTimestampsMap[tab.name.toUpperCase().trim()] ||
         testTimestampsMap[tab.name];
 
-      if (tabSpecificTimestamp) {
-        const formatted = formatTabTimestamp(tabSpecificTimestamp, record.createdAtFormatted);
-        record.tabTimestamp = tabSpecificTimestamp;
-        record.tabTimestampFormatted = formatted;
-        record.createdAtFormatted = formatted;
-      } else {
-        const formatted = formatTabTimestamp(record.createdAtFormatted, record.createdAt);
-        record.tabTimestampFormatted = formatted;
-        record.createdAtFormatted = formatted;
-      }
+      const visualTimestamp = syncTimestamp
+        ? currentFormattedTime
+        : tabSpecificTimestamp
+        ? formatTabTimestamp(tabSpecificTimestamp, record.createdAtFormatted)
+        : formatTabTimestamp(record.createdAtFormatted, record.createdAt);
 
       record.projectCode = projectCode;
       record.testStatus = testStatus;
+      record.lastUpdate = new Date().toISOString();
+      record.tabTimestampFormatted = visualTimestamp;
+      record.createdAtFormatted = visualTimestamp;
+      record.isLiveFromGoogle = true;
+
       results.push(record);
     } catch (e) {
       console.warn(`Error al procesar la pestaña de test "${tab.name}":`, e);
@@ -1806,21 +1819,30 @@ export async function fetchAllSheetAnalyses(
     const projectCode = extractProjectCode(defaultTab.name);
     defaultRecord.projectCode = projectCode;
     defaultRecord.testStatus = testStatusesMap[projectCode] === "No Activo" ? "No Activo" : "Activo";
-    
-    const tabSpecificTimestamp = testTimestampsMap[projectCode] || testTimestampsMap[defaultTab.name.toUpperCase()];
-    if (tabSpecificTimestamp) {
-      const formatted = formatTabTimestamp(tabSpecificTimestamp, defaultRecord.createdAtFormatted);
-      defaultRecord.tabTimestamp = tabSpecificTimestamp;
-      defaultRecord.tabTimestampFormatted = formatted;
-      defaultRecord.createdAtFormatted = formatted;
-    } else {
-      defaultRecord.tabTimestampFormatted = formatTabTimestamp(defaultRecord.createdAtFormatted);
-    }
+    defaultRecord.lastUpdate = new Date().toISOString();
+    defaultRecord.tabTimestampFormatted = currentFormattedTime;
+    defaultRecord.createdAtFormatted = currentFormattedTime;
+    defaultRecord.isLiveFromGoogle = true;
 
     results.push(defaultRecord);
   }
 
   return results;
+}
+
+export async function fetchAllSheetAnalyses(
+  spreadsheetUrl: string = GOOGLE_SHEET_URL,
+  appsScriptUrl: string = APPS_SCRIPT_URL,
+  syncTimestamp?: string
+): Promise<SheetAnalysisRecord[]> {
+  // 1. Prioridad: Consulta al endpoint unificado de doGet en Apps Script (JSON compacto)
+  const unifiedFromScript = await fetchUnifiedFromAppsScript(appsScriptUrl);
+  if (unifiedFromScript && unifiedFromScript.length > 0) {
+    return unifiedFromScript;
+  }
+
+  // 2. Cruce integral de datos
+  return executeFullDataMergeSync(spreadsheetUrl, appsScriptUrl, syncTimestamp);
 }
 
 export interface TestConfigMetadata {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Navbar } from "./components/Navbar";
 import { StatsCards } from "./components/StatsCards"; // Metric cards component
 import { AgentTable } from "./components/AgentTable";
@@ -34,6 +34,7 @@ import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL } from "./utils/googleSheetsConfig";
 import {
   SheetAnalysisRecord,
   fetchAllSheetAnalyses,
+  executeFullDataMergeSync,
   extractSpreadsheetId,
   testSpreadsheetConnection,
   updateTestStatusRemote,
@@ -42,6 +43,7 @@ import {
   getDashboardLocalCache,
   saveDashboardLocalCache,
   clearDashboardLocalCache,
+  formatTabTimestamp,
 } from "./utils/googleSheetsService";
 
 export default function App() {
@@ -72,6 +74,11 @@ export default function App() {
   const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [isLiveFromGoogle, setIsLiveFromGoogle] = useState(false);
   const [needsPermissionNotice, setNeedsPermissionNotice] = useState(false);
+
+  // Dynamic states for real-time auto-sync re-rendering (Cursos Pendientes, Supervisores, JCCs)
+  const [staffCount, setStaffCount] = useState<number>(0);
+  const [aprobadosCount, setAprobadosCount] = useState<number>(0);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => formatTabTimestamp(new Date()));
 
   useEffect(() => {
     activeAnalysisIdRef.current = activeAnalysisId;
@@ -159,12 +166,15 @@ export default function App() {
     }
   };
 
-  const applyAnalysesToDashboard = (
+  const applyAnalysesToDashboard = useCallback((
     analyses: SheetAnalysisRecord[],
     showNotifications = false,
-    fromCache = false
+    fromCache = false,
+    customSyncTimestamp?: string
   ) => {
     if (!analyses || analyses.length === 0) return;
+
+    const currentFormattedSyncTime = customSyncTimestamp || formatTabTimestamp(new Date());
 
     // FILTRADO ESTRICTO DE BAJAS: Sanitizar cada análisis para excluir absolutamente a los agentes de baja
     const sanitizedAnalyses: SheetAnalysisRecord[] = analyses.map((a) => {
@@ -185,6 +195,11 @@ export default function App() {
       const evalCount = appCount + failCount;
       const pRate = evalCount > 0 ? Math.round((appCount / evalCount) * 100) : 0;
 
+      // Actualizar estampa de tiempo visual del curso para reflejar la modificación real
+      const visualTimestamp = customSyncTimestamp
+        ? currentFormattedSyncTime
+        : a.tabTimestampFormatted || a.createdAtFormatted || currentFormattedSyncTime;
+
       return {
         ...a,
         totalAgents: cleanRecs.length,
@@ -194,6 +209,9 @@ export default function App() {
         passRate: pRate,
         averageScore: avg,
         records: cleanRecs,
+        lastUpdate: new Date().toISOString(),
+        tabTimestampFormatted: visualTimestamp,
+        createdAtFormatted: visualTimestamp,
       };
     });
 
@@ -249,6 +267,11 @@ export default function App() {
       records: selected.records,
     });
 
+    // Actualizar estados dinámicos del componente para forzar re-renderizado automático
+    setStaffCount(selected.totalAgents);
+    setAprobadosCount(selected.approvedCount);
+    setLastSyncTime(currentFormattedSyncTime);
+
     if (showNotifications) {
       if (fromCache) {
         showToast(`⚡ Datos validados al 100% desde caché local (${analyses.length} evaluaciones).`, "success");
@@ -258,7 +281,13 @@ export default function App() {
         showToast("Google Sheet en modo restringido. Se muestran datos base.", "warning");
       }
     }
-  };
+  }, [activeAnalysisId]);
+
+  // Referencia actualizada para evitar que callbacks asíncronos sufran de stale state
+  const applyAnalysesRef = useRef(applyAnalysesToDashboard);
+  useEffect(() => {
+    applyAnalysesRef.current = applyAnalysesToDashboard;
+  }, [applyAnalysesToDashboard]);
 
   // Load / Sincronizar Google Sheets Data con Estrategia de Caché Inteligente & Control de Peso Pluma
   const loadGoogleSheetsData = async (showNotifications = true, forceClean = false) => {
@@ -300,7 +329,7 @@ export default function App() {
         setIsLiveFromGoogle(true);
       }
 
-      const analyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
+      const analyses = await executeFullDataMergeSync(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
       if (analyses && analyses.length > 0) {
         // Obtener la firma/token Z1 actual para persistir en la nueva caché
         const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL, activeAnalysisIdRef.current)) || String(Date.now());
@@ -332,20 +361,21 @@ export default function App() {
     loadGoogleSheetsData(true, true);
   };
 
+  // CENTINELA DE 10 SEGUNDOS CON CRUCE COMPLETO DE DATOS (DATA MERGING) EN SEGUNDO PLANO
   useEffect(() => {
     // 1. Carga inicial al montar el componente
     loadGoogleSheetsData(false, false);
 
     // 2. Centinela Activo con temporizador cíclico de exactamente 10 segundos (10000 ms)
     const SENTINEL_INTERVAL_MS = 10000;
-    let isChecking = false;
+    const isCheckingRef = { current: false };
 
     const runSentinelCheck = async () => {
-      if (isChecking) return;
-      isChecking = true;
+      if (isCheckingRef.current) return;
+      isCheckingRef.current = true;
 
       try {
-        // Petición asíncrona a la API de Google Sheets consultando firma/marca de tiempo de última modificación
+        // Petición asíncrona a la API de Google Sheets consultando firma de modificación de pestañas activas
         const currentTab = activeAnalysisIdRef.current;
         const remoteSig = await fetchSheetLastModifiedSignature(
           GOOGLE_SHEET_URL,
@@ -373,21 +403,35 @@ export default function App() {
         // Comparación estricta: estado actual vs respuesta remota de Google Sheets
         if (remoteSig !== localSig) {
           console.log(
-            `🔄 [Centinela 10s] Modificación detectada en Google Sheets (Remoto: "${remoteSig}" vs Local: "${localSig}"). Sincronizando dashboard en tiempo real...`
+            `🔄 [Centinela 10s] ¡Cambio detectado en Google Sheets! (Remoto: "${remoteSig}" vs Local: "${localSig}"). Gatillando cruce integral de datos...`
           );
 
-          // Actualizar referencia del token
+          // Actualizar inmediatamente la firma para evitar ejecuciones duplicadas concurrentes
           lastKnownSignatureRef.current = remoteSig;
           try {
             localStorage.setItem("apex_z1_token", remoteSig);
           } catch {}
 
-          // Disparar automáticamente la recarga y renderizado en vivo para actualizar tarjetas métricas y listas sin recargar la página
-          const freshAnalyses = await fetchAllSheetAnalyses(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
+          // Estampa de tiempo exacta de la modificación real detectada
+          const modificationTimestamp = formatTabTimestamp(new Date());
+
+          // 1. Invocar explícitamente el cruce completo de datos (data merging), asignación de supervisores ("Sup"), cálculo de aprobados y filtrado de notas
+          const freshAnalyses = await executeFullDataMergeSync(
+            GOOGLE_SHEET_URL,
+            APPS_SCRIPT_URL,
+            modificationTimestamp
+          );
+
           if (freshAnalyses && freshAnalyses.length > 0) {
+            // Guardar en caché con la nueva firma
             saveDashboardLocalCache(freshAnalyses, remoteSig, GOOGLE_SHEET_URL);
-            applyAnalysesToDashboard(freshAnalyses, false, false);
-            console.log(`✅ [Centinela 10s] Sincronización en vivo completada con éxito (${freshAnalyses.length} evaluaciones).`);
+
+            // 2. Aplicar al dashboard y actualizar estados dinámicos ('setStaffCount', 'setAprobadosCount', 'setLastSyncTime') y la estampa visual
+            applyAnalysesRef.current(freshAnalyses, false, false, modificationTimestamp);
+
+            console.log(
+              `✅ [Centinela 10s] Cruce de datos y re-renderizado en vivo completado con éxito a las ${modificationTimestamp} (${freshAnalyses.length} cursos actualizados).`
+            );
           }
         } else {
           console.log(`🛡️ [Centinela 10s] Google Sheet verificado sin cambios (firma: "${remoteSig}"). Dashboard sincronizado.`);
@@ -395,7 +439,7 @@ export default function App() {
       } catch (err) {
         console.warn("⚠️ [Centinela 10s] Error durante la consulta de verificación:", err);
       } finally {
-        isChecking = false;
+        isCheckingRef.current = false;
       }
     };
 
@@ -412,6 +456,7 @@ export default function App() {
   // Switch Active Analysis / Tab (ACTION_SELECT_TEST)
   const handleSelectAnalysis = (analysis: SheetAnalysisRecord) => {
     setActiveAnalysisId(analysis.id);
+    activeAnalysisIdRef.current = analysis.id;
     const cleanRecs = (analysis.records || []).filter((r) => !isBajaRecord(r));
     setRecords(cleanRecs);
     setSelectedTestIds([]);
@@ -421,14 +466,21 @@ export default function App() {
     setSelectedSupervisor(null);
     setStatusFilter("ALL");
 
+    const appCount = cleanRecs.filter((r) => r.status === "Aprobado").length;
+    const failCount = cleanRecs.filter((r) => r.status === "No Aprobado").length;
+
+    // Actualizar estados dinámicos del curso seleccionado
+    setStaffCount(cleanRecs.length);
+    setAprobadosCount(appCount);
+
     setCurrentBatch({
       id: analysis.id,
       fileName: analysis.name,
       fileType: "document",
       uploadDate: analysis.createdAt.split("T")[0],
       totalAgents: cleanRecs.length,
-      approvedCount: cleanRecs.filter((r) => r.status === "Aprobado").length,
-      failedCount: cleanRecs.filter((r) => r.status === "No Aprobado").length,
+      approvedCount: appCount,
+      failedCount: failCount,
       averageScore: analysis.averageScore,
       trainingTopic: analysis.trainingTopic,
       trainer: analysis.trainer,
