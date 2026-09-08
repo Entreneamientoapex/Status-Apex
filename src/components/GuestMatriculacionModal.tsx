@@ -25,7 +25,7 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
   const [legajoUsuario, setLegajoUsuario] = useState("");
   const [nombreCursoTest, setNombreCursoTest] = useState("");
   const [motivo, setMotivo] = useState("Ingreso de nuevo colaborador a la operación.");
-  const [archivoAdjunto, setArchivoAdjunto] = useState<{ nombre: string; tamano: string } | null>(null);
+  const [archivoAdjunto, setArchivoAdjunto] = useState<{ nombre: string; tamano: string; url?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -34,18 +34,16 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const sizeKb = Math.round(file.size / 1024);
-      setArchivoAdjunto({
-        nombre: file.name,
-        tamano: `${sizeKb} KB`,
-      });
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setArchivoAdjunto({
+          nombre: file.name,
+          tamano: `${sizeKb} KB`,
+          url: uploadEvent.target?.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
     }
-  };
-
-  const handleSimulateFile = () => {
-    setArchivoAdjunto({
-      nombre: "evidencia_matriculacion.png",
-      tamano: "480 KB",
-    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -62,6 +60,8 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
       shortDescription: `Agente ${legajoUsuario.trim()} (${nombreCompleto.trim()}) pendiente de alta en ${nombreCursoTest.trim()}.`,
       timestamp: "Hace un momento",
       isRead: false,
+      evidenciaUrl: archivoAdjunto?.url,
+      evidenciaNombre: archivoAdjunto?.nombre,
       informacionDetallada: {
         categoria: "Matriculación y Usuarios",
         origen: "Formulario de Invitado / Operaciones",
@@ -73,10 +73,15 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
           nombreCompleto: nombreCompleto.trim(),
           legajoUsuario: legajoUsuario.trim(),
           nombreCursoTest: nombreCursoTest.trim(),
-          adjunto: {
-            nombreArchivo: archivoAdjunto ? archivoAdjunto.nombre : "evidencia_matriculacion.png",
-            tamano: archivoAdjunto ? archivoAdjunto.tamano : "480 KB",
-          },
+          evidenciaUrl: archivoAdjunto?.url,
+          evidenciaNombre: archivoAdjunto?.nombre,
+          adjunto: archivoAdjunto
+            ? {
+                nombreArchivo: archivoAdjunto.nombre,
+                tamano: archivoAdjunto.tamano,
+                url: archivoAdjunto.url,
+              }
+            : undefined,
         },
         recomendacionAccion: "Verificar registro en la pestaña Lista_agentes y copiar plantilla de matriculación hacia soporte.",
       },
@@ -235,13 +240,6 @@ export const GuestMatriculacionModal: React.FC<GuestMatriculacionModalProps> = (
                     </p>
                     <p className="text-[10px] text-[#6B7366] mt-0.5">PNG, JPG o PDF hasta 5MB</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSimulateFile}
-                    className="mt-1 text-[11px] font-semibold text-[#4F7A4F] hover:bg-[#E6F3E6] px-2.5 py-1 rounded-md transition"
-                  >
-                    Usar evidencia_matriculacion.png de ejemplo
-                  </button>
                 </div>
               )}
             </div>

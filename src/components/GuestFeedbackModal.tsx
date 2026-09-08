@@ -23,9 +23,9 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
 }) => {
   const [remitente, setRemitente] = useState("");
   const [comentario, setComentario] = useState("");
-  const [colaborador, setColaborador] = useState("Gómez, Facundo (U616446)");
-  const [notaDesempeno, setNotaDesempeno] = useState("95 / 100 (Excelente)");
-  const [archivoAdjunto, setArchivoAdjunto] = useState<{ nombre: string; tamano: string } | null>(null);
+  const [colaborador, setColaborador] = useState("");
+  const [notaDesempeno, setNotaDesempeno] = useState("");
+  const [archivoAdjunto, setArchivoAdjunto] = useState<{ nombre: string; tamano: string; url?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -34,18 +34,16 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const sizeKb = Math.round(file.size / 1024);
-      setArchivoAdjunto({
-        nombre: file.name,
-        tamano: `${sizeKb} KB`,
-      });
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setArchivoAdjunto({
+          nombre: file.name,
+          tamano: `${sizeKb} KB`,
+          url: uploadEvent.target?.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
     }
-  };
-
-  const handleSimulateFile = () => {
-    setArchivoAdjunto({
-      nombre: "auditoria_calidad.png",
-      tamano: "390 KB",
-    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -62,6 +60,8 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
       shortDescription: `${remitente.trim()} ha cargado una nueva devolución de auditoría para revisión.`,
       timestamp: "Hace un momento",
       isRead: false,
+      evidenciaUrl: archivoAdjunto?.url,
+      evidenciaNombre: archivoAdjunto?.nombre,
       informacionDetallada: {
         categoria: "FEEDBACK",
         origen: "Módulo de Auditoría y Coaching Pedagógico",
@@ -69,11 +69,17 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
         resumenImpacto: "El colaborador requiere feedback firmado para habilitar su paso a operaciones avanzadas.",
         feedbackData: {
           evaluadorTrainer: remitente.trim(),
-          fechaDevolucion: "21/08/2026 - Reciente",
-          notaDesempeno: notaDesempeno.trim(),
-          colaborador: colaborador.trim(),
-          areaServicio: "Soporte Nivel 2 • Operaciones",
+          fechaDevolucion: new Date().toLocaleDateString() + " - Reciente",
           observacionesClave: comentario.trim(),
+          evidenciaUrl: archivoAdjunto?.url,
+          evidenciaNombre: archivoAdjunto?.nombre,
+          adjunto: archivoAdjunto
+            ? {
+                nombreArchivo: archivoAdjunto.nombre,
+                tamano: archivoAdjunto.tamano,
+                url: archivoAdjunto.url,
+              }
+            : undefined,
         },
         recomendacionAccion: "Revisar los puntos clave observados y coordinar sesión de coaching uno a uno.",
       },
@@ -200,15 +206,8 @@ export const GuestFeedbackModal: React.FC<GuestFeedbackModalProps> = ({
                         />
                       </label>
                     </p>
-                    <p className="text-[10px] text-[#6B7366] mt-0.5">PNG o JPG de la auditoría</p>
+                    <p className="text-[10px] text-[#6B7366] mt-0.5">Formatos de imagen admitidos: PNG, JPG, JPEG</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSimulateFile}
-                    className="mt-1 text-[11px] font-semibold text-[#2563EB] hover:bg-[#EFF6FF] px-2.5 py-1 rounded-md transition"
-                  >
-                    Usar auditoria_calidad.png de ejemplo
-                  </button>
                 </div>
               )}
             </div>

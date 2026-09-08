@@ -31,6 +31,8 @@ export interface NotificationItem {
   shortDescription: string;
   timestamp: string;
   isRead: boolean;
+  evidenciaUrl?: string;
+  evidenciaNombre?: string;
   informacionDetallada: {
     categoria: string;
     origen: string;
@@ -44,18 +46,28 @@ export interface NotificationItem {
       nombreCompleto: string;
       legajoUsuario: string;
       nombreCursoTest: string;
+      evidenciaUrl?: string;
+      evidenciaNombre?: string;
       adjunto?: {
         nombreArchivo: string;
-        tamano: string;
+        tamano?: string;
+        url?: string;
       };
     };
     feedbackData?: {
       evaluadorTrainer: string;
       fechaDevolucion: string;
-      notaDesempeno: string;
-      colaborador: string;
-      areaServicio: string;
+      notaDesempeno?: string;
+      colaborador?: string;
+      areaServicio?: string;
       observacionesClave: string;
+      evidenciaUrl?: string;
+      evidenciaNombre?: string;
+      adjunto?: {
+        nombreArchivo: string;
+        tamano?: string;
+        url?: string;
+      };
     };
   };
 }
@@ -149,8 +161,24 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
     }
   };
 
-  // Simulación de descarga de imagen adjunta
-  const handleDownloadAttachment = (filename: string) => {
+  // Descarga de archivo adjunto (soporta URL real o genera canvas de respaldo)
+  const handleDownloadAttachment = (filename: string, fileUrl?: string) => {
+    if (fileUrl) {
+      if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+        window.open(fileUrl, "_blank");
+        showToast(`Abriendo evidencia: ${filename}`);
+        return;
+      }
+      if (fileUrl.startsWith("data:") || fileUrl.startsWith("blob:")) {
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = fileUrl;
+        link.click();
+        showToast(`Descargando captura: ${filename}`);
+        return;
+      }
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = 600;
     canvas.height = 350;
@@ -164,9 +192,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
       ctx.fillStyle = "#4B5246";
       ctx.font = "14px sans-serif";
       ctx.fillText(`Archivo: ${filename}`, 40, 100);
-      ctx.fillText("Solicitud de Alta: Juan Pérez (U616446)", 40, 130);
-      ctx.fillText("Curso Destino: CD2633", 40, 160);
-      ctx.fillText("Fecha de Validación: 21/08/2026", 40, 190);
+      ctx.fillText("Fecha de Validación: " + new Date().toLocaleDateString(), 40, 130);
       ctx.strokeStyle = "#4F7A4F";
       ctx.lineWidth = 3;
       ctx.strokeRect(30, 30, 540, 290);
@@ -483,99 +509,208 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                     </div>
                   </div>
                 ) : (activeNotification.type === "feedback" || activeNotification.type === "system") ? (
-                  <div className="space-y-4 pt-1">
-                    <div>
-                      <p className="text-sm font-bold text-[#1E241B]">Remitente / Quien Envió:</p>
-                      <p className="text-sm text-slate-600 mb-3">
-                        {activeNotification.informacionDetallada.feedbackData?.evaluadorTrainer ||
-                          activeNotification.informacionDetallada.origen ||
-                          "Evaluador"}
-                      </p>
-                    </div>
+                  (() => {
+                    // Mapeo dinámico de evidencia o captura adjunta desde la planilla o formulario
+                    const evidenciaUrl =
+                      activeNotification.evidenciaUrl ||
+                      activeNotification.informacionDetallada.feedbackData?.evidenciaUrl ||
+                      activeNotification.informacionDetallada.feedbackData?.adjunto?.url ||
+                      (activeNotification.informacionDetallada.datosTecnicos?.evidenciaUrl as string) ||
+                      (activeNotification.informacionDetallada.datosTecnicos?.["URL Evidencia"] as string) ||
+                      (activeNotification.informacionDetallada.datosTecnicos?.url as string) ||
+                      null;
 
-                    {activeNotification.informacionDetallada.feedbackData?.colaborador && (
-                      <div>
-                        <p className="text-sm font-bold text-[#1E241B]">Colaborador / Agente:</p>
-                        <p className="text-sm text-slate-600 mb-3">
-                          {activeNotification.informacionDetallada.feedbackData.colaborador}
-                        </p>
+                    const evidenciaNombre =
+                      activeNotification.informacionDetallada.feedbackData?.adjunto?.nombreArchivo ||
+                      activeNotification.informacionDetallada.feedbackData?.evidenciaNombre ||
+                      activeNotification.evidenciaNombre ||
+                      (evidenciaUrl
+                        ? (() => {
+                            try {
+                              const parsed = new URL(evidenciaUrl);
+                              const parts = parsed.pathname.split("/").filter(Boolean);
+                              const lastPart = parts[parts.length - 1];
+                              return lastPart ? decodeURIComponent(lastPart) : "captura_evidencia.png";
+                            } catch {
+                              const parts = evidenciaUrl.split("/").filter(Boolean);
+                              const last = parts[parts.length - 1];
+                              return last || "captura_evidencia.png";
+                            }
+                          })()
+                        : null);
+
+                    // Si no cuenta con ninguna captura en la planilla de origen, se oculta por completo la tarjeta
+                    const tieneEvidencia = Boolean(evidenciaUrl || evidenciaNombre);
+
+                    return (
+                      <div className="space-y-4 pt-1">
+                        {/* Remitente / Quien Envió */}
+                        <div>
+                          <p className="text-sm font-bold text-[#1E241B]">Remitente / Quien Envió:</p>
+                          <p className="text-sm text-slate-600 mb-3">
+                            {activeNotification.informacionDetallada.feedbackData?.evaluadorTrainer ||
+                              activeNotification.informacionDetallada.origen ||
+                              "Evaluador"}
+                          </p>
+                        </div>
+
+                        {/* Comentario / Devolución Realizada */}
+                        <div>
+                          <p className="text-sm font-bold text-[#1E241B]">Comentario / Devolución Realizada:</p>
+                          <p className="text-sm text-slate-600 mb-4 whitespace-pre-wrap leading-relaxed">
+                            {activeNotification.informacionDetallada.feedbackData?.observacionesClave ||
+                              activeNotification.informacionDetallada.motivo ||
+                              activeNotification.shortDescription}
+                          </p>
+                        </div>
+
+                        {/* EVIDENCIA / CAPTURA ADJUNTA (Renderizada dinámicamente; oculta si no existe archivo) */}
+                        {tieneEvidencia && (
+                          <div className="border border-dashed border-slate-200 p-4 rounded-xl mb-4 bg-[#FAFBF9]">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                              Evidencia / Captura Adjunta
+                            </p>
+                            <div className="flex items-center justify-between mt-2 gap-3">
+                              <span
+                                className="text-xs text-slate-600 font-medium truncate max-w-[200px] sm:max-w-xs"
+                                title={evidenciaNombre || evidenciaUrl || "Captura de evidencia"}
+                              >
+                                {evidenciaNombre || "captura_evidencia.png"}
+                              </span>
+
+                              {evidenciaUrl ? (
+                                <a
+                                  id="btn-download-feedback-evidence"
+                                  href={evidenciaUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download={evidenciaNombre || "captura_evidencia.png"}
+                                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs shrink-0"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>Descargar Imagen</span>
+                                </a>
+                              ) : (
+                                <button
+                                  id="btn-download-feedback-evidence"
+                                  type="button"
+                                  onClick={() => handleDownloadAttachment(evidenciaNombre || "captura_evidencia.png")}
+                                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs shrink-0"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>Descargar Imagen</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-
-                    {activeNotification.informacionDetallada.feedbackData?.notaDesempeno && (
-                      <div>
-                        <p className="text-sm font-bold text-[#1E241B]">Calificación / Desempeño:</p>
-                        <p className="text-sm font-bold text-emerald-700 mb-3">
-                          {activeNotification.informacionDetallada.feedbackData.notaDesempeno}
-                        </p>
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="text-sm font-bold text-[#1E241B]">Comentario / Devolución Realizada:</p>
-                      <p className="text-sm text-slate-600 mb-4 whitespace-pre-wrap leading-relaxed">
-                        {activeNotification.informacionDetallada.feedbackData?.observacionesClave ||
-                          activeNotification.informacionDetallada.motivo ||
-                          activeNotification.shortDescription}
-                      </p>
-                    </div>
-
-                    <div className="border border-dashed border-slate-200 p-4 rounded-xl mb-4 bg-[#FAFBF9]">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Evidencia / Captura Adjunta
-                      </p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-slate-600 font-medium">auditoria_calidad.png</span>
-                        <button
-                          id="btn-download-feedback-evidence"
-                          onClick={() => handleDownloadAttachment("auditoria_calidad.png")}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
-                        >
-                          Descargar Imagen
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()
                 ) : null}
 
                 {/* SECCIÓN DE IMAGEN ADJUNTA (DESCARGABLE) - Solo para Matriculación */}
-                {activeNotification.type === "matriculacion" && activeNotification.informacionDetallada.matriculacionData?.adjunto && (
-                  <div className="space-y-2">
-                    <h5 className="text-xs font-bold text-[#2D332A] uppercase tracking-wider text-[11px]">
-                      Evidencia / Captura Adjunta
-                    </h5>
-                    <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#D9DED4] bg-[#FAFBF9] hover:bg-[#F5F7F3] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#E6F3E6] border border-[#C5DAC5] flex items-center justify-center text-[#4F7A4F] shrink-0">
-                          <ImageIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-[#1E241B] truncate max-w-[200px] sm:max-w-xs">
-                            {activeNotification.informacionDetallada.matriculacionData.adjunto.nombreArchivo}
-                          </p>
-                          <p className="text-[11px] text-[#6B7366]">
-                            Captura de pantalla • {activeNotification.informacionDetallada.matriculacionData.adjunto.tamano}
-                          </p>
-                        </div>
-                      </div>
+                {activeNotification.type === "matriculacion" && (() => {
+                  const matEvidenciaUrl =
+                    activeNotification.evidenciaUrl ||
+                    activeNotification.informacionDetallada.matriculacionData?.evidenciaUrl ||
+                    activeNotification.informacionDetallada.matriculacionData?.adjunto?.url ||
+                    (activeNotification.informacionDetallada.datosTecnicos?.evidenciaUrl as string) ||
+                    (activeNotification.informacionDetallada.datosTecnicos?.["URL Evidencia"] as string) ||
+                    (activeNotification.informacionDetallada.datosTecnicos?.["Evidencia"] as string) ||
+                    (activeNotification.informacionDetallada.datosTecnicos?.url as string) ||
+                    null;
 
-                      <button
-                        id="btn-download-evidence"
-                        onClick={() =>
-                          handleDownloadAttachment(
-                            activeNotification.informacionDetallada.matriculacionData?.adjunto?.nombreArchivo || "evidencia_matriculacion.png"
-                          )
+                  const rawNombre =
+                    activeNotification.informacionDetallada.matriculacionData?.adjunto?.nombreArchivo ||
+                    activeNotification.informacionDetallada.matriculacionData?.evidenciaNombre ||
+                    activeNotification.evidenciaNombre;
+
+                  const isDummy =
+                    rawNombre === "auditoria_calidad.png" ||
+                    rawNombre === "evidencia_matriculacion.png";
+
+                  const matEvidenciaNombre = matEvidenciaUrl
+                    ? (() => {
+                        try {
+                          const parsed = new URL(matEvidenciaUrl);
+                          const parts = parsed.pathname.split("/").filter(Boolean);
+                          const lastPart = parts[parts.length - 1];
+                          return lastPart
+                            ? decodeURIComponent(lastPart)
+                            : (!isDummy && rawNombre ? rawNombre : "evidencia_matriculacion.png");
+                        } catch {
+                          const parts = matEvidenciaUrl.split("/").filter(Boolean);
+                          const last = parts[parts.length - 1];
+                          return last || (!isDummy && rawNombre ? rawNombre : "evidencia_matriculacion.png");
                         }
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
-                        title="Descargar captura de pantalla"
-                      >
-                        <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
-                        <span className="hidden sm:inline">Descargar Imagen</span>
-                        <span className="sm:hidden">Descargar</span>
-                      </button>
+                      })()
+                    : (!isDummy && rawNombre ? rawNombre : null);
+
+                  // Si la fila específica del Sheet no contiene ningún enlace o archivo adjunto, se oculta por completo
+                  const tieneEvidencia = Boolean(matEvidenciaUrl || matEvidenciaNombre);
+                  if (!tieneEvidencia) return null;
+
+                  const tamano = activeNotification.informacionDetallada.matriculacionData?.adjunto?.tamano;
+
+                  return (
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-bold text-[#2D332A] uppercase tracking-wider text-[11px]">
+                        Evidencia / Captura Adjunta
+                      </h5>
+                      <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#D9DED4] bg-[#FAFBF9] hover:bg-[#F5F7F3] transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-[#E6F3E6] border border-[#C5DAC5] flex items-center justify-center text-[#4F7A4F] shrink-0">
+                            <ImageIcon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p
+                              className="text-xs font-bold text-[#1E241B] truncate max-w-[200px] sm:max-w-xs"
+                              title={matEvidenciaNombre || matEvidenciaUrl || "Captura de pantalla"}
+                            >
+                              {matEvidenciaNombre || "evidencia_matriculacion.png"}
+                            </p>
+                            <p className="text-[11px] text-[#6B7366]">
+                              Captura de pantalla{tamano ? ` • ${tamano}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {matEvidenciaUrl ? (
+                          <a
+                            id="btn-download-evidence"
+                            href={matEvidenciaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={matEvidenciaNombre || "evidencia_matriculacion.png"}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                            title="Descargar captura de pantalla"
+                          >
+                            <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
+                            <span className="hidden sm:inline">Descargar Imagen</span>
+                            <span className="sm:hidden">Descargar</span>
+                          </a>
+                        ) : (
+                          <button
+                            id="btn-download-evidence"
+                            type="button"
+                            onClick={() =>
+                              handleDownloadAttachment(
+                                matEvidenciaNombre || "evidencia_matriculacion.png"
+                              )
+                            }
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                            title="Descargar captura de pantalla"
+                          >
+                            <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
+                            <span className="hidden sm:inline">Descargar Imagen</span>
+                            <span className="sm:hidden">Descargar</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Recomendación / Acción Sugerida para Matriculación */}
                 {activeNotification.type === "matriculacion" && activeNotification.informacionDetallada.recomendacionAccion && (
