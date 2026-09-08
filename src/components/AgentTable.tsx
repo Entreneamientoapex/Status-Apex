@@ -1267,9 +1267,10 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                 {(() => {
                                   const minScore = agent.minPassingScore || 80;
                                   const hasScore = agent.score !== null && !isNaN(agent.score);
-                                  const isScoreApproved = hasScore && (agent.score as number) >= minScore;
-                                  const isScoreFailed = hasScore && (agent.score as number) < minScore;
                                   const isPending = !hasScore || agent.status === "Pendiente" || agent.status === "Ausente";
+                                  const isScoreApproved = !isPending && (hasScore ? (agent.score as number) >= minScore : agent.status === "Aprobado");
+                                  const isScoreFailed = !isPending && (hasScore ? (agent.score as number) < minScore : agent.status === "No Aprobado");
+                                  const scoreValue = hasScore ? agent.score : (isScoreApproved ? 100 : 0);
 
                                   if (isEditor) {
                                     return (
@@ -1293,9 +1294,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                         )}
                                         <span>
                                           {isScoreApproved
-                                            ? `APROBADO (${agent.score}/${minScore})`
+                                            ? `APROBADO (${scoreValue}/100)`
                                             : isScoreFailed
-                                            ? `NO APROBADO (${agent.score}/${minScore})`
+                                            ? `NO APROBADO (${scoreValue}/100)`
                                             : "PENDIENTE"}
                                         </span>
                                       </button>
@@ -1321,9 +1322,9 @@ export const AgentTable: React.FC<AgentTableProps> = ({
                                       )}
                                       <span>
                                         {isScoreApproved
-                                          ? `APROBADO (${agent.score}/${minScore})`
+                                          ? `APROBADO (${scoreValue}/100)`
                                           : isScoreFailed
-                                          ? `NO APROBADO (${agent.score}/${minScore})`
+                                          ? `NO APROBADO (${scoreValue}/100)`
                                           : "PENDIENTE"}
                                       </span>
                                     </span>
