@@ -621,35 +621,44 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                     (activeNotification.informacionDetallada.datosTecnicos?.url as string) ||
                     null;
 
+                  // Si esa fila específica del Sheet no contiene ningún enlace o archivo adjunto, oculta por completo este bloque gris de evidencia
+                  if (!matEvidenciaUrl || matEvidenciaUrl.trim() === "" || matEvidenciaUrl === "#") {
+                    return null;
+                  }
+
                   const rawNombre =
-                    activeNotification.informacionDetallada.matriculacionData?.adjunto?.nombreArchivo ||
+                    activeNotification.evidenciaNombre ||
                     activeNotification.informacionDetallada.matriculacionData?.evidenciaNombre ||
-                    activeNotification.evidenciaNombre;
+                    activeNotification.informacionDetallada.matriculacionData?.adjunto?.nombreArchivo;
 
                   const isDummy =
                     rawNombre === "auditoria_calidad.png" ||
                     rawNombre === "evidencia_matriculacion.png";
 
-                  const matEvidenciaNombre = matEvidenciaUrl
-                    ? (() => {
-                        try {
-                          const parsed = new URL(matEvidenciaUrl);
-                          const parts = parsed.pathname.split("/").filter(Boolean);
-                          const lastPart = parts[parts.length - 1];
-                          return lastPart
-                            ? decodeURIComponent(lastPart)
-                            : (!isDummy && rawNombre ? rawNombre : "evidencia_matriculacion.png");
-                        } catch {
-                          const parts = matEvidenciaUrl.split("/").filter(Boolean);
-                          const last = parts[parts.length - 1];
-                          return last || (!isDummy && rawNombre ? rawNombre : "evidencia_matriculacion.png");
-                        }
-                      })()
-                    : (!isDummy && rawNombre ? rawNombre : null);
-
-                  // Si la fila específica del Sheet no contiene ningún enlace o archivo adjunto, se oculta por completo
-                  const tieneEvidencia = Boolean(matEvidenciaUrl || matEvidenciaNombre);
-                  if (!tieneEvidencia) return null;
+                  // Extraer nombre legible a partir de la URL real enviada
+                  const displayNombre = (() => {
+                    if (!isDummy && rawNombre && rawNombre.trim() !== "") {
+                      return rawNombre.trim();
+                    }
+                    try {
+                      const urlObj = new URL(matEvidenciaUrl);
+                      const pathnameParts = urlObj.pathname.split("/").filter(Boolean);
+                      const lastPart = pathnameParts[pathnameParts.length - 1];
+                      if (lastPart && lastPart.length > 2) {
+                        return decodeURIComponent(lastPart);
+                      }
+                      if (urlObj.hostname.includes("drive.google.com") || urlObj.hostname.includes("docs.google.com")) {
+                        return "evidencia_adjunta_drive.pdf";
+                      }
+                    } catch {
+                      const parts = matEvidenciaUrl.split("/").filter(Boolean);
+                      const last = parts[parts.length - 1];
+                      if (last && last.length > 2) {
+                        return last.split("?")[0];
+                      }
+                    }
+                    return "evidencia_adjunta.png";
+                  })();
 
                   const tamano = activeNotification.informacionDetallada.matriculacionData?.adjunto?.tamano;
 
@@ -658,6 +667,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                       <h5 className="text-xs font-bold text-[#2D332A] uppercase tracking-wider text-[11px]">
                         Evidencia / Captura Adjunta
                       </h5>
+
                       <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#D9DED4] bg-[#FAFBF9] hover:bg-[#F5F7F3] transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-10 h-10 rounded-lg bg-[#E6F3E6] border border-[#C5DAC5] flex items-center justify-center text-[#4F7A4F] shrink-0">
@@ -666,47 +676,29 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                           <div className="min-w-0">
                             <p
                               className="text-xs font-bold text-[#1E241B] truncate max-w-[200px] sm:max-w-xs"
-                              title={matEvidenciaNombre || matEvidenciaUrl || "Captura de pantalla"}
+                              title={displayNombre}
                             >
-                              {matEvidenciaNombre || "evidencia_matriculacion.png"}
+                              {displayNombre}
                             </p>
                             <p className="text-[11px] text-[#6B7366]">
-                              Captura de pantalla{tamano ? ` • ${tamano}` : ""}
+                              Documento / Captura{tamano ? ` • ${tamano}` : ""}
                             </p>
                           </div>
                         </div>
 
-                        {matEvidenciaUrl ? (
-                          <a
-                            id="btn-download-evidence"
-                            href={matEvidenciaUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={matEvidenciaNombre || "evidencia_matriculacion.png"}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
-                            title="Descargar captura de pantalla"
-                          >
-                            <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
-                            <span className="hidden sm:inline">Descargar Imagen</span>
-                            <span className="sm:hidden">Descargar</span>
-                          </a>
-                        ) : (
-                          <button
-                            id="btn-download-evidence"
-                            type="button"
-                            onClick={() =>
-                              handleDownloadAttachment(
-                                matEvidenciaNombre || "evidencia_matriculacion.png"
-                              )
-                            }
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
-                            title="Descargar captura de pantalla"
-                          >
-                            <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
-                            <span className="hidden sm:inline">Descargar Imagen</span>
-                            <span className="sm:hidden">Descargar</span>
-                          </button>
-                        )}
+                        <a
+                          id="btn-download-evidence"
+                          href={matEvidenciaUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={displayNombre}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-[#F1F3EE] text-[#2D332A] border border-[#D9DED4] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                          title="Descargar o ver documento adjunto"
+                        >
+                          <Download className="h-3.5 w-3.5 text-[#4F7A4F]" />
+                          <span className="hidden sm:inline">Descargar Imagen</span>
+                          <span className="sm:hidden">Descargar</span>
+                        </a>
                       </div>
                     </div>
                   );

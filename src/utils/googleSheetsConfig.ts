@@ -23,3 +23,11 @@ export const KNOWN_SHEET_TABS = [
   "CD2641 | Genesys Cloud (para supervisores)",
   "CD2633 Genesys Cloud"
 ];
+
+// 👇 4. MAPEO INDEPENDIENTE DE FILE ID (GOOGLE DRIVE) POR CURSO / EVALUACIÓN
+// Permite asociar a cada curso (ej: CD2641, CD2633) su Google Sheet File ID correspondiente para consultar modifiedTime
+export const COURSE_FILE_IDS: Record<string, string> = {
+  "CD2641": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+  "CD2633": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+  "DEFAULT": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+};

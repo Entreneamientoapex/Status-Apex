@@ -1,5 +1,11 @@
 import { AgentRecord, ApprovalStatus, ConfigUser } from "../types";
-import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL, DEFAULT_PASSING_SCORE, KNOWN_SHEET_TABS } from "./googleSheetsConfig";
+import {
+  GOOGLE_SHEET_URL,
+  APPS_SCRIPT_URL,
+  DEFAULT_PASSING_SCORE,
+  KNOWN_SHEET_TABS,
+  COURSE_FILE_IDS,
+} from "./googleSheetsConfig";
 import { INITIAL_DEMO_RECORDS } from "./demoData";
 import {
   isBajaRecord,
@@ -26,9 +32,13 @@ export interface SheetAnalysisRecord {
   name: string; // Nombre del test / pestaña
   sheetName: string;
   tabGid?: string | null;
+  fileId?: string; // ID del archivo en Google Drive / Google Sheets
+  lastModifiedInSheet?: string; // Fecha y hora EXACTA de última modificación de Google Drive API (DD/MM/AAAA HH:MM)
+  lastModifiedInSheetISO?: string; // ISO 8601 de modifiedTime de Google Drive API
   createdAt: string;
   createdAtFormatted: string;
   lastUpdate?: string; // Marca de tiempo nativa provista desde Apps Script (lastUpdate)
+  lastUpdated?: string; // Marca de tiempo local exacta 'DD/MM/AAAA HH:MM' del cruce de datos
   tabTimestamp?: string; // Marca de tiempo individual provista desde Config_Usuarios / Apps Script
   tabTimestampFormatted?: string; // Fecha y hora individual formateada (DD/MM/AAAA HH:MM)
   totalAgents: number; // Total FIJO de la base de datos maestra (261 asesores)
@@ -324,6 +334,42 @@ export function parseNumericScore(valStr: string | undefined | null): number | n
 }
 
 /**
+ * Formatea un objeto Date nativo de JavaScript o fecha actual exactamente al formato 'DD/MM/AAAA HH:MM'
+ * (dos dígitos para el día, mes, hora y minutos) usando la hora local real.
+ */
+export function formatToLocalTimestamp(date: Date = new Date()): string {
+  const d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date();
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear();
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+/**
+ * Convierte un string ISO/RFC 3339 'modifiedTime' de Google Drive API a la zona horaria local
+ * del navegador/usuario empleando un objeto de JavaScript ('new Date(modifiedTime)').
+ * Formatea la salida visual exactamente como se muestra en las tarjetas actuales bajo el icono del reloj:
+ * 'DD/MM/AAAA HH:MM' (dos dígitos para el día, mes, hora y minutos).
+ */
+export function formatModifiedTimeToLocal(modifiedTime?: string | Date | null): string {
+  if (!modifiedTime) return formatToLocalTimestamp(new Date());
+  const date = typeof modifiedTime === "string" ? new Date(modifiedTime) : modifiedTime;
+  if (isNaN(date.getTime())) {
+    return formatToLocalTimestamp(new Date());
+  }
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear();
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+/**
  * Extrae la fecha desde el nombre de la pestaña o genera la fecha actual
  */
 function extractDateFromTabName(tabName: string): { iso: string; formatted: string } {
@@ -343,16 +389,15 @@ function extractDateFromTabName(tabName: string): { iso: string; formatted: stri
   }
 
   const now = new Date();
-  const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
   const iso = now.toISOString();
-  const formatted = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const formatted = formatToLocalTimestamp(now);
   return { iso, formatted };
 }
 
 /**
  * Formatea marcas de tiempo individuales a 'DD/MM/AAAA HH:MM' de forma dinámica e independiente.
- * Lee timestamps en formato texto (DD/MM/AAAA HH:MM, ISO), números o Date objects.
- * Si no registra una hora particular todavía, recurre al respaldo estable provisto.
+ * Lee timestamps en formato texto (DD/MM/AAAA HH:MM, ISO), números o Date objects usando la hora real local.
+ * Si no registra una hora particular todavía, recurre al momento exacto con new Date().
  */
 export function formatTabTimestamp(
   rawDateOrTimestamp?: string | number | Date | null,
@@ -363,17 +408,15 @@ export function formatTabTimestamp(
     : fallbackTimestamp;
 
   if (value === undefined || value === null || value === "") {
-    const now = new Date();
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-    return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return formatToLocalTimestamp(new Date());
   }
 
   // 1. Si es instancia de Date
   if (value instanceof Date) {
     if (!isNaN(value.getTime())) {
-      const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-      return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+      return formatToLocalTimestamp(value);
     }
+    return formatToLocalTimestamp(new Date());
   }
 
   // 2. Si es timestamp numérico (milisegundos o segundos)
@@ -382,21 +425,25 @@ export function formatTabTimestamp(
       const ms = value < 10000000000 ? value * 1000 : value;
       const d = new Date(ms);
       if (!isNaN(d.getTime())) {
-        const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return formatToLocalTimestamp(d);
       }
     }
+    return formatToLocalTimestamp(new Date());
   }
 
   // 3. Si es cadena de texto
   const str = String(value).trim();
   if (!str) {
-    const now = new Date();
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-    return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return formatToLocalTimestamp(new Date());
   }
 
-  // Patrón DD/MM/AAAA HH:MM o DD/MM/YYYY HH:MM:SS
+  // Si ya es exactamente 'DD/MM/AAAA HH:MM' con 2 dígitos en cada campo y 4 en año
+  const exactMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (exactMatch) {
+    return str;
+  }
+
+  // Patrón DD/MM/AAAA HH:MM o DD/MM/YYYY HH:MM:SS (1 o 2 dígitos)
   const ddmmyyyyTimeMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})[T\s]+(\d{1,2}):(\d{2})(?::\d{2})?/);
   if (ddmmyyyyTimeMatch) {
     let day = parseInt(ddmmyyyyTimeMatch[1], 10);
@@ -405,41 +452,17 @@ export function formatTabTimestamp(
     if (year < 100) year += 2000;
     const hour = parseInt(ddmmyyyyTimeMatch[4], 10);
     const min = parseInt(ddmmyyyyTimeMatch[5], 10);
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
     return `${pad(day)}/${pad(month)}/${year} ${pad(hour)}:${pad(min)}`;
   }
 
-  // Patrón ISO YYYY-MM-DDTHH:MM(:SS)
-  const isoTimeMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})[T\s]+(\d{1,2}):(\d{2})(?::\d{2})?/);
-  if (isoTimeMatch) {
-    const year = parseInt(isoTimeMatch[1], 10);
-    const month = parseInt(isoTimeMatch[2], 10);
-    const day = parseInt(isoTimeMatch[3], 10);
-    const hour = parseInt(isoTimeMatch[4], 10);
-    const min = parseInt(isoTimeMatch[5], 10);
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-    return `${pad(day)}/${pad(month)}/${year} ${pad(hour)}:${pad(min)}`;
-  }
-
-  // Patrón solo fecha DD/MM/AAAA
-  const dateOnlyMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})$/);
-  if (dateOnlyMatch) {
-    let day = parseInt(dateOnlyMatch[1], 10);
-    let month = parseInt(dateOnlyMatch[2], 10);
-    let year = parseInt(dateOnlyMatch[3], 10);
-    if (year < 100) year += 2000;
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-    return `${pad(day)}/${pad(month)}/${year} 10:00`;
-  }
-
-  // Intento de conversión estándar con Date.parse
+  // Si es un ISO string o convertible mediante Date nativo (convierte UTC a HORA REAL LOCAL)
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
-    const pad = (n: number) => (n < 10 ? "0" + n : n.toString());
-    return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+    return formatToLocalTimestamp(parsed);
   }
 
-  return str;
+  return formatToLocalTimestamp(new Date());
 }
 
 /**
@@ -744,6 +767,111 @@ export function extractProjectCode(tabName: string): string {
     return firstWord.toUpperCase();
   }
   return clean.toUpperCase();
+}
+
+/**
+ * 3. Mapeo por Curso Independiente:
+ * Obtiene el 'fileId' de Google Drive correspondiente a una planilla o curso determinado.
+ * Permite asociar a cada curso (ej: CD2641, CD2633) su Google Sheet File ID correspondiente para consultar modifiedTime.
+ */
+export function getCourseFileId(
+  courseNameOrCode: string,
+  defaultSpreadsheetUrl: string = GOOGLE_SHEET_URL
+): string {
+  const fallbackId = extractSpreadsheetId(defaultSpreadsheetUrl) || "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg";
+  if (!courseNameOrCode) return fallbackId;
+
+  const projectCode = extractProjectCode(courseNameOrCode) || "";
+  if (projectCode && COURSE_FILE_IDS[projectCode]) {
+    return COURSE_FILE_IDS[projectCode];
+  }
+
+  const upper = courseNameOrCode.toUpperCase();
+  for (const [key, id] of Object.entries(COURSE_FILE_IDS)) {
+    if (key !== "DEFAULT" && (upper.includes(key) || courseNameOrCode.includes(key))) {
+      return id;
+    }
+  }
+
+  return fallbackId;
+}
+
+/**
+ * 1. Consumo de metadatos de Google Drive API:
+ * Consulta en paralelo utilizando el endpoint oficial de Google Drive API v3:
+ * 'https://www.googleapis.com/drive/v3/files/{fileId}?fields=modifiedTime'
+ * y extrae con precisión la propiedad 'modifiedTime' de la respuesta JSON (en formato estandarizado ISO/RFC 3339).
+ */
+export async function fetchDriveFileModifiedTime(
+  fileId: string,
+  accessToken?: string | null
+): Promise<string | null> {
+  if (!fileId) return null;
+
+  // 1. Consulta directa a Google Drive API v3 (endpoint https://www.googleapis.com/drive/v3/files/{fileId})
+  try {
+    const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime&supportsAllDrives=true`;
+    const headers: Record<string, string> = {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+    };
+    if (accessToken && !accessToken.startsWith("demo_") && !accessToken.startsWith("mock_")) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const driveRes = await fetch(driveUrl, { headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (driveRes.ok) {
+      const data = await driveRes.json();
+      if (data && typeof data.modifiedTime === "string" && data.modifiedTime.trim() !== "") {
+        return data.modifiedTime;
+      }
+    }
+  } catch {
+    // Continuar a backend proxy o metadato de revisión de sheets
+  }
+
+  // 2. Consulta al backend de la aplicación (/api/drive/file-metadata)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const backendRes = await fetch(`/api/drive/file-metadata?fileId=${encodeURIComponent(fileId)}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (backendRes.ok) {
+      const bData = await backendRes.json();
+      if (bData && typeof bData.modifiedTime === "string" && bData.modifiedTime.trim() !== "") {
+        return bData.modifiedTime;
+      }
+    }
+  } catch {
+    // Continuar a fallback de metadato de revisión de Sheets
+  }
+
+  // 3. Extracción de metadato de revisión de Google Sheets export (timestamp de modificación global)
+  try {
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&range=A1:A1&_t=${Date.now()}`;
+    const headRes = await fetch(exportUrl, {
+      redirect: "manual",
+      cache: "no-store",
+    });
+    const loc = headRes.headers.get("location");
+    if (loc) {
+      const match = loc.match(/\/(\d{13})\//);
+      if (match) {
+        const ms = parseInt(match[1], 10);
+        return new Date(ms).toISOString();
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  return null;
 }
 
 /**
@@ -1629,18 +1757,25 @@ function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] 
       raw.createdAtFormatted ||
       raw.createdAt;
 
-    const formattedIndividualTimestamp = formatTabTimestamp(rawIndividualTimestamp, timeInfo.formatted);
+    // Captura de hora real local para la evaluación
+    const localNow = formatToLocalTimestamp(new Date());
+    const courseTimestamp = raw.lastUpdated
+      ? formatTabTimestamp(raw.lastUpdated)
+      : raw.lastUpdate && !String(raw.lastUpdate).includes("10:00")
+      ? formatTabTimestamp(raw.lastUpdate)
+      : localNow;
 
     return {
       id: raw.id || `tab_${(raw.name || `test_${idx}`).replace(/[^a-zA-Z0-9_-]/g, "_")}`,
       name: raw.name || raw.sheetName || `Evaluación ${idx + 1}`,
       sheetName: raw.sheetName || raw.name || `Evaluación ${idx + 1}`,
       tabGid: raw.tabGid || null,
-      createdAt: raw.createdAt || (rawIndividualTimestamp ? String(rawIndividualTimestamp) : timeInfo.iso),
-      createdAtFormatted: formattedIndividualTimestamp,
-      lastUpdate: raw.lastUpdate ? String(raw.lastUpdate) : (rawIndividualTimestamp ? String(rawIndividualTimestamp) : undefined),
-      tabTimestamp: rawIndividualTimestamp ? String(rawIndividualTimestamp) : undefined,
-      tabTimestampFormatted: formattedIndividualTimestamp,
+      createdAt: raw.createdAt || (rawIndividualTimestamp ? String(rawIndividualTimestamp) : localNow),
+      createdAtFormatted: courseTimestamp,
+      lastUpdate: courseTimestamp,
+      lastUpdated: courseTimestamp,
+      tabTimestamp: courseTimestamp,
+      tabTimestampFormatted: courseTimestamp,
       totalAgents,
       approvedCount,
       failedCount,
@@ -1748,7 +1883,8 @@ export async function fetchUnifiedFromAppsScript(
 export async function executeFullDataMergeSync(
   spreadsheetUrl: string = GOOGLE_SHEET_URL,
   appsScriptUrl: string = APPS_SCRIPT_URL,
-  syncTimestamp?: string
+  syncTimestamp?: string,
+  courseDriveModifiedTimes?: Record<string, string>
 ): Promise<SheetAnalysisRecord[]> {
   console.log("ℹ️ [Data Merging] Ejecutando cruce integral de datos con Google Sheets CSV/GViz...");
   
@@ -1761,6 +1897,27 @@ export async function executeFullDataMergeSync(
   // Consultar en vivo la pestaña Config_Usuarios para obtener el estado (Activo / No Activo) y marcas de tiempo particulares
   const testConfigMeta = await fetchTestConfigMetadata(spreadsheetUrl);
   const { statusMap: testStatusesMap, timestampMap: testTimestampsMap } = testConfigMeta;
+
+  // Pre-cargar metadatos de Google Drive API (modifiedTime) para cada archivo en paralelo
+  const driveTimesMap: Record<string, string> = { ...(courseDriveModifiedTimes || {}) };
+  const uniqueFileIds = Array.from(
+    new Set(testTabs.map((tab) => getCourseFileId(tab.name, spreadsheetUrl)))
+  );
+
+  await Promise.all(
+    uniqueFileIds.map(async (fId) => {
+      if (!driveTimesMap[fId]) {
+        try {
+          const modTime = await fetchDriveFileModifiedTime(fId);
+          if (modTime) {
+            driveTimesMap[fId] = modTime;
+          }
+        } catch {
+          // Ignorar error individual
+        }
+      }
+    })
+  );
 
   const currentFormattedTime = syncTimestamp || formatTabTimestamp(new Date());
   const results: SheetAnalysisRecord[] = [];
@@ -1783,24 +1940,29 @@ export async function executeFullDataMergeSync(
         testStatus = "No Activo";
       }
 
-      // Asimilar marca de tiempo particular provista desde Config_Usuarios (si existe) o timestamp de modificación en vivo
-      const tabSpecificTimestamp =
-        (projectCode && testTimestampsMap[projectCode]) ||
-        (cleanTabName && testTimestampsMap[cleanTabName]) ||
-        testTimestampsMap[tab.name.toUpperCase().trim()] ||
-        testTimestampsMap[tab.name];
+      // Mapear el fileId correspondiente de la planilla a su tarjeta respectiva (ej: CD2641, CD2633)
+      const fileId = getCourseFileId(tab.name, spreadsheetUrl);
+      record.fileId = fileId;
 
-      const visualTimestamp = syncTimestamp
-        ? currentFormattedTime
-        : tabSpecificTimestamp
-        ? formatTabTimestamp(tabSpecificTimestamp, record.createdAtFormatted)
-        : formatTabTimestamp(record.createdAtFormatted, record.createdAt);
+      // Extraer 'modifiedTime' de Google Drive API v3 (formato ISO/RFC 3339) y convertir a hora local
+      const driveModifiedISO = driveTimesMap[fileId] || null;
+      let courseTimestamp: string;
+      if (driveModifiedISO) {
+        courseTimestamp = formatModifiedTimeToLocal(driveModifiedISO);
+        record.lastModifiedInSheetISO = driveModifiedISO;
+      } else if (syncTimestamp) {
+        courseTimestamp = syncTimestamp;
+      } else {
+        courseTimestamp = formatToLocalTimestamp(new Date());
+      }
 
       record.projectCode = projectCode;
       record.testStatus = testStatus;
-      record.lastUpdate = new Date().toISOString();
-      record.tabTimestampFormatted = visualTimestamp;
-      record.createdAtFormatted = visualTimestamp;
+      record.lastModifiedInSheet = courseTimestamp;
+      record.lastUpdated = courseTimestamp;
+      record.lastUpdate = courseTimestamp;
+      record.tabTimestampFormatted = courseTimestamp;
+      record.createdAtFormatted = courseTimestamp;
       record.isLiveFromGoogle = true;
 
       results.push(record);
@@ -1817,11 +1979,23 @@ export async function executeFullDataMergeSync(
     };
     const defaultRecord = await fetchAndJoinTestAnalysis(defaultTab, masterAgents, spreadsheetUrl);
     const projectCode = extractProjectCode(defaultTab.name);
+    const defaultFileId = getCourseFileId(defaultTab.name, spreadsheetUrl);
+    const defaultDriveModISO = driveTimesMap[defaultFileId] || null;
+    const defaultTimestamp = defaultDriveModISO
+      ? formatModifiedTimeToLocal(defaultDriveModISO)
+      : currentFormattedTime;
+
+    defaultRecord.fileId = defaultFileId;
     defaultRecord.projectCode = projectCode;
     defaultRecord.testStatus = testStatusesMap[projectCode] === "No Activo" ? "No Activo" : "Activo";
-    defaultRecord.lastUpdate = new Date().toISOString();
-    defaultRecord.tabTimestampFormatted = currentFormattedTime;
-    defaultRecord.createdAtFormatted = currentFormattedTime;
+    defaultRecord.lastModifiedInSheet = defaultTimestamp;
+    if (defaultDriveModISO) {
+      defaultRecord.lastModifiedInSheetISO = defaultDriveModISO;
+    }
+    defaultRecord.lastUpdated = defaultTimestamp;
+    defaultRecord.lastUpdate = defaultTimestamp;
+    defaultRecord.tabTimestampFormatted = defaultTimestamp;
+    defaultRecord.createdAtFormatted = defaultTimestamp;
     defaultRecord.isLiveFromGoogle = true;
 
     results.push(defaultRecord);

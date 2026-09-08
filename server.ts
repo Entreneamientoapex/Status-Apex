@@ -40,6 +40,58 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Google Drive File Metadata Endpoint (Retrieves modifiedTime ISO/RFC 3339 for Google Sheets / Drive files)
+  app.get("/api/drive/file-metadata", async (req: Request, res: Response) => {
+    try {
+      const fileId = String(req.query.fileId || "").trim();
+      if (!fileId) {
+        return res.status(400).json({ error: "fileId is required" });
+      }
+
+      // 1. Query Google Drive API v3 endpoint directly
+      try {
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,modifiedTime`;
+        const driveRes = await fetch(driveUrl);
+        if (driveRes.ok) {
+          const data = await driveRes.json();
+          if (data && data.modifiedTime) {
+            return res.json({ fileId, modifiedTime: data.modifiedTime, source: "drive_v3" });
+          }
+        }
+      } catch {
+        // Continue to revision extraction
+      }
+
+      // 2. Query Google Sheets export revision metadata (returns exact file modification timestamp)
+      try {
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&range=A1:A1&_t=${Date.now()}`;
+        const headRes = await fetch(exportUrl, { redirect: "manual" });
+        const loc = headRes.headers.get("location");
+        if (loc) {
+          const match = loc.match(/\/(\d{13})\//);
+          if (match) {
+            const ms = parseInt(match[1], 10);
+            return res.json({
+              fileId,
+              modifiedTime: new Date(ms).toISOString(),
+              source: "sheets_revision",
+            });
+          }
+        }
+      } catch {
+        // Fallback
+      }
+
+      return res.json({
+        fileId,
+        modifiedTime: new Date().toISOString(),
+        source: "fallback",
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Error fetching Drive metadata" });
+    }
+  });
+
   // Dedicated Backend Function / Endpoint:
   // Receives the two files (Course Sheet + Agent IDs List), compares 'Usuario' vs Agent IDs,
   // discards non-matching rows, extracts scores from columns R to U (80, 90, 100 approved),

@@ -30,7 +30,7 @@ import {
   Lock,
   Mail,
 } from "lucide-react";
-import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL } from "./utils/googleSheetsConfig";
+import { GOOGLE_SHEET_URL, APPS_SCRIPT_URL, COURSE_FILE_IDS } from "./utils/googleSheetsConfig";
 import {
   SheetAnalysisRecord,
   fetchAllSheetAnalyses,
@@ -44,6 +44,10 @@ import {
   saveDashboardLocalCache,
   clearDashboardLocalCache,
   formatTabTimestamp,
+  formatToLocalTimestamp,
+  formatModifiedTimeToLocal,
+  fetchDriveFileModifiedTime,
+  getCourseFileId,
 } from "./utils/googleSheetsService";
 
 export default function App() {
@@ -68,9 +72,17 @@ export default function App() {
 
   // Google Sheets Tabs & History State
   const [history, setHistory] = useState<SheetAnalysisRecord[]>([]);
+  const historyRef = useRef<SheetAnalysisRecord[]>(history);
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
   const [activeAnalysisId, setActiveAnalysisId] = useState<string | null>(null);
   const activeAnalysisIdRef = useRef<string | null>(null);
   const lastKnownSignatureRef = useRef<string | null>(null);
+
+  // 3. Almacenamiento por Curso Independiente de Google Drive modifiedTime
+  const [courseModifiedTimes, setCourseModifiedTimes] = useState<Record<string, string>>({});
+  const lastKnownModifiedTimesRef = useRef<Record<string, string>>({});
   const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [isLiveFromGoogle, setIsLiveFromGoogle] = useState(false);
   const [needsPermissionNotice, setNeedsPermissionNotice] = useState(false);
@@ -78,7 +90,7 @@ export default function App() {
   // Dynamic states for real-time auto-sync re-rendering (Cursos Pendientes, Supervisores, JCCs)
   const [staffCount, setStaffCount] = useState<number>(0);
   const [aprobadosCount, setAprobadosCount] = useState<number>(0);
-  const [lastSyncTime, setLastSyncTime] = useState<string>(() => formatTabTimestamp(new Date()));
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => formatToLocalTimestamp(new Date()));
 
   useEffect(() => {
     activeAnalysisIdRef.current = activeAnalysisId;
@@ -201,7 +213,7 @@ export default function App() {
   ) => {
     if (!analyses || analyses.length === 0) return;
 
-    const currentFormattedSyncTime = customSyncTimestamp || formatTabTimestamp(new Date());
+    const currentFormattedSyncTime = customSyncTimestamp || formatToLocalTimestamp(new Date());
 
     // FILTRADO ESTRICTO DE BAJAS: Sanitizar cada análisis para excluir absolutamente a los agentes de baja
     const sanitizedAnalyses: SheetAnalysisRecord[] = analyses.map((a) => {
@@ -222,13 +234,32 @@ export default function App() {
       const evalCount = appCount + failCount;
       const pRate = evalCount > 0 ? Math.round((appCount / evalCount) * 100) : 0;
 
-      // Actualizar estampa de tiempo visual del curso para reflejar la modificación real
-      const visualTimestamp = customSyncTimestamp
-        ? currentFormattedSyncTime
-        : a.tabTimestampFormatted || a.createdAtFormatted || currentFormattedSyncTime;
+      // 3. Mapeo por Curso Independiente:
+      // Mapear el fileId correspondiente de la planilla a su tarjeta respectiva (ej: CD2641, CD2633)
+      const courseFileId = a.fileId || getCourseFileId(a.name || a.sheetName, GOOGLE_SHEET_URL);
+
+      // Mantener la estampa de tiempo independiente de este curso:
+      // Priorizar el metadato 'lastModifiedInSheet' de Google Drive API si está presente
+      const courseTimestamp =
+        a.lastModifiedInSheet && a.lastModifiedInSheet.trim() !== ""
+          ? a.lastModifiedInSheet
+          : customSyncTimestamp
+          ? customSyncTimestamp
+          : a.lastUpdated && a.lastUpdated.trim() !== ""
+          ? formatTabTimestamp(a.lastUpdated)
+          : a.lastUpdate && a.lastUpdate.trim() !== ""
+          ? formatTabTimestamp(a.lastUpdate)
+          : a.tabTimestampFormatted && a.tabTimestampFormatted.trim() !== ""
+          ? formatTabTimestamp(a.tabTimestampFormatted)
+          : a.createdAtFormatted && a.createdAtFormatted.trim() !== ""
+          ? formatTabTimestamp(a.createdAtFormatted)
+          : currentFormattedSyncTime;
 
       return {
         ...a,
+        fileId: courseFileId,
+        lastModifiedInSheet: courseTimestamp,
+        lastModifiedInSheetISO: a.lastModifiedInSheetISO,
         totalAgents: cleanRecs.length,
         approvedCount: appCount,
         failedCount: failCount,
@@ -236,9 +267,10 @@ export default function App() {
         passRate: pRate,
         averageScore: avg,
         records: cleanRecs,
-        lastUpdate: new Date().toISOString(),
-        tabTimestampFormatted: visualTimestamp,
-        createdAtFormatted: visualTimestamp,
+        lastUpdated: courseTimestamp,
+        lastUpdate: courseTimestamp,
+        tabTimestampFormatted: courseTimestamp,
+        createdAtFormatted: courseTimestamp,
       };
     });
 
@@ -297,7 +329,7 @@ export default function App() {
     // Actualizar estados dinámicos del componente para forzar re-renderizado automático
     setStaffCount(selected.totalAgents);
     setAprobadosCount(selected.approvedCount);
-    setLastSyncTime(currentFormattedSyncTime);
+    setLastSyncTime(selected.lastModifiedInSheet || currentFormattedSyncTime);
 
     if (showNotifications) {
       if (fromCache) {
@@ -356,7 +388,30 @@ export default function App() {
         setIsLiveFromGoogle(true);
       }
 
-      const analyses = await executeFullDataMergeSync(GOOGLE_SHEET_URL, APPS_SCRIPT_URL);
+      // Pre-cargar metadatos de Google Drive API (modifiedTime) para cada archivo en paralelo
+      const driveTimesMap: Record<string, string> = {};
+      try {
+        const uniqueFileIds = Array.from(new Set(Object.values(COURSE_FILE_IDS)));
+        await Promise.all(
+          uniqueFileIds.map(async (fId) => {
+            const mTime = await fetchDriveFileModifiedTime(fId);
+            if (mTime) {
+              driveTimesMap[fId] = mTime;
+            }
+          })
+        );
+        lastKnownModifiedTimesRef.current = { ...driveTimesMap };
+        setCourseModifiedTimes(driveTimesMap);
+      } catch (dErr) {
+        console.warn("⚠️ Error al precargar metadatos de Drive:", dErr);
+      }
+
+      const analyses = await executeFullDataMergeSync(
+        GOOGLE_SHEET_URL,
+        APPS_SCRIPT_URL,
+        undefined,
+        driveTimesMap
+      );
       if (analyses && analyses.length > 0) {
         // Obtener la firma/token Z1 actual para persistir en la nueva caché
         const currentSig = (await fetchSheetLastModifiedSignature(GOOGLE_SHEET_URL, APPS_SCRIPT_URL, activeAnalysisIdRef.current)) || String(Date.now());
@@ -388,7 +443,7 @@ export default function App() {
     loadGoogleSheetsData(true, true);
   };
 
-  // CENTINELA DE 10 SEGUNDOS CON CRUCE COMPLETO DE DATOS (DATA MERGING) EN SEGUNDO PLANO
+  // CENTINELA DE 10 SEGUNDOS CON CONSUMO DE METADATOS DE GOOGLE DRIVE API (MODIFIEDTIME)
   useEffect(() => {
     // 1. Carga inicial al montar el componente
     loadGoogleSheetsData(false, false);
@@ -402,69 +457,147 @@ export default function App() {
       isCheckingRef.current = true;
 
       try {
-        // Petición asíncrona a la API de Google Sheets consultando firma de modificación de pestañas activas
+        // 1. Mapeo por Curso Independiente:
+        // Obtener la lista de cursos actuales o conocidos con su fileId correspondiente
+        const currentCourses = historyRef.current.length > 0 ? historyRef.current : [];
+        const fileIdSet = new Set<string>();
+
+        currentCourses.forEach((c) => {
+          const fId = c.fileId || getCourseFileId(c.name || c.sheetName, GOOGLE_SHEET_URL);
+          if (fId) fileIdSet.add(fId);
+        });
+
+        Object.values(COURSE_FILE_IDS).forEach((fId) => {
+          if (fId) fileIdSet.add(fId);
+        });
+
+        const uniqueFileIds = Array.from(fileIdSet);
+        if (uniqueFileIds.length === 0) return;
+
+        // 2. Consumo de metadatos de Google Drive API:
+        // Consulta en paralelo utilizando el endpoint oficial de Google Drive API v3
+        // para extraer con precisión la propiedad 'modifiedTime' (en formato ISO/RFC 3339)
+        const driveResults = await Promise.all(
+          uniqueFileIds.map(async (fId) => {
+            try {
+              const modifiedISO = await fetchDriveFileModifiedTime(fId);
+              return { fileId: fId, modifiedISO };
+            } catch (err) {
+              console.warn(`[Centinela 10s] Error al consultar Google Drive para ${fId}:`, err);
+              return { fileId: fId, modifiedISO: null };
+            }
+          })
+        );
+
+        const currentDriveTimes: Record<string, string> = {};
+        driveResults.forEach((res) => {
+          if (res.modifiedISO) {
+            currentDriveTimes[res.fileId] = res.modifiedISO;
+          }
+        });
+
+        const prevTimes = lastKnownModifiedTimesRef.current;
+        const hasPrev = Object.keys(prevTimes).length > 0;
+
+        // Si es la primera ejecución del centinela y no teníamos tiempos de Drive previos:
+        if (!hasPrev) {
+          lastKnownModifiedTimesRef.current = { ...currentDriveTimes };
+          setCourseModifiedTimes((prev) => ({ ...prev, ...currentDriveTimes }));
+
+          // Actualizar las tarjetas de los cursos con sus estampas de Google Drive formateadas a hora local
+          if (Object.keys(currentDriveTimes).length > 0) {
+            setHistory((prevHistory) =>
+              prevHistory.map((course) => {
+                const fId = course.fileId || getCourseFileId(course.name, GOOGLE_SHEET_URL);
+                const driveISO = currentDriveTimes[fId];
+                if (driveISO) {
+                  const formatted = formatModifiedTimeToLocal(driveISO);
+                  return {
+                    ...course,
+                    fileId: fId,
+                    lastModifiedInSheet: formatted,
+                    lastModifiedInSheetISO: driveISO,
+                    lastUpdated: formatted,
+                    lastUpdate: formatted,
+                    tabTimestampFormatted: formatted,
+                    createdAtFormatted: formatted,
+                  };
+                }
+                return course;
+              })
+            );
+          }
+          return;
+        }
+
+        // 3. Formateo y Renderizado de los Datos en Pantalla:
+        // Solo debes actualizar la fecha/hora en la interfaz si 'modifiedTime' ha cambiado
+        // respecto al valor previo registrado. Si el archivo no ha sido editado, la estampa
+        // permanece inalterada y no avanza continuamente en cada ciclo de 10 segundos.
+        let anyFileChanged = false;
+        const changedFileIds: string[] = [];
+
+        for (const [fId, newISO] of Object.entries(currentDriveTimes)) {
+          const oldISO = prevTimes[fId];
+          if (oldISO && newISO !== oldISO) {
+            anyFileChanged = true;
+            changedFileIds.push(fId);
+            console.log(
+              `🔄 [Centinela 10s] ¡Modificación detectada en Google Drive! (fileId: ${fId}, Nuevo modifiedTime: ${newISO} vs Anterior: ${oldISO})`
+            );
+          }
+        }
+
+        // Señal complementaria de firma de modificación en Google Sheets
         const currentTab = activeAnalysisIdRef.current;
         const remoteSig = await fetchSheetLastModifiedSignature(
           GOOGLE_SHEET_URL,
           APPS_SCRIPT_URL,
           currentTab
         );
-
-        if (!remoteSig) return;
-
         const cached = getDashboardLocalCache(GOOGLE_SHEET_URL);
         const localSig =
           lastKnownSignatureRef.current ||
           (typeof window !== "undefined" ? localStorage.getItem("apex_z1_token") : null) ||
           cached?.versionSig;
 
-        // Primera sincronización del token local si no existía previamente
-        if (!localSig) {
+        if (remoteSig && localSig && remoteSig !== localSig) {
+          anyFileChanged = true;
           lastKnownSignatureRef.current = remoteSig;
           try {
             localStorage.setItem("apex_z1_token", remoteSig);
           } catch {}
-          return;
         }
 
-        // Comparación estricta: estado actual vs respuesta remota de Google Sheets
-        if (remoteSig !== localSig) {
+        if (anyFileChanged) {
           console.log(
-            `🔄 [Centinela 10s] ¡Cambio detectado en Google Sheets! (Remoto: "${remoteSig}" vs Local: "${localSig}"). Gatillando cruce integral de datos...`
+            `🔄 [Centinela 10s] Ejecutando cruce integral de datos para planillas modificadas: ${changedFileIds.join(", ")}...`
           );
 
-          // Actualizar inmediatamente la firma para evitar ejecuciones duplicadas concurrentes
-          lastKnownSignatureRef.current = remoteSig;
-          try {
-            localStorage.setItem("apex_z1_token", remoteSig);
-          } catch {}
+          lastKnownModifiedTimesRef.current = { ...currentDriveTimes };
+          setCourseModifiedTimes((prev) => ({ ...prev, ...currentDriveTimes }));
 
-          // Estampa de tiempo exacta de la modificación real detectada
-          const modificationTimestamp = formatTabTimestamp(new Date());
-
-          // 1. Invocar explícitamente el cruce completo de datos (data merging), asignación de supervisores ("Sup"), cálculo de aprobados y filtrado de notas
           const freshAnalyses = await executeFullDataMergeSync(
             GOOGLE_SHEET_URL,
             APPS_SCRIPT_URL,
-            modificationTimestamp
+            undefined,
+            currentDriveTimes
           );
 
           if (freshAnalyses && freshAnalyses.length > 0) {
-            // Guardar en caché con la nueva firma
-            saveDashboardLocalCache(freshAnalyses, remoteSig, GOOGLE_SHEET_URL);
-
-            // 2. Aplicar al dashboard y actualizar estados dinámicos ('setStaffCount', 'setAprobadosCount', 'setLastSyncTime') y la estampa visual
-            applyAnalysesRef.current(freshAnalyses, false, false, modificationTimestamp);
-
+            saveDashboardLocalCache(freshAnalyses, remoteSig || JSON.stringify(currentDriveTimes), GOOGLE_SHEET_URL);
+            applyAnalysesRef.current(freshAnalyses, false, false);
             console.log(
-              `✅ [Centinela 10s] Cruce de datos y re-renderizado en vivo completado con éxito a las ${modificationTimestamp} (${freshAnalyses.length} cursos actualizados).`
+              `✅ [Centinela 10s] Cruce de datos y re-renderizado completado fielmente con Google Drive modifiedTime.`
             );
           }
         } else {
-          console.log(`🛡️ [Centinela 10s] Google Sheet verificado sin cambios (firma: "${remoteSig}"). Dashboard sincronizado.`);
+          console.log(
+            `🛡️ [Centinela 10s] Google Drive verificado sin modificaciones. Las tarjetas de los cursos mantienen su estampa de tiempo exacta e inalterada.`
+          );
         }
       } catch (err) {
-        console.warn("⚠️ [Centinela 10s] Error durante la consulta de verificación:", err);
+        console.warn("⚠️ [Centinela 10s] Error durante la consulta de verificación de Drive:", err);
       } finally {
         isCheckingRef.current = false;
       }

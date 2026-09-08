@@ -13,7 +13,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-import { SheetAnalysisRecord, formatTabTimestamp } from "../utils/googleSheetsService";
+import { SheetAnalysisRecord, formatTabTimestamp, formatToLocalTimestamp } from "../utils/googleSheetsService";
 
 interface AnalysisHistoryCardProps {
   history: SheetAnalysisRecord[];
@@ -209,11 +209,17 @@ export const AnalysisHistoryCard: React.FC<AnalysisHistoryCardProps> = ({
                     <div className="text-slate-400 text-xs font-sans flex items-center gap-1.5 mt-1">
                       <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                       <span>
-                        {item.lastUpdate && item.lastUpdate.trim() !== ""
+                        {item.lastModifiedInSheet && item.lastModifiedInSheet.trim() !== ""
+                          ? item.lastModifiedInSheet
+                          : item.lastUpdated && item.lastUpdated.trim() !== ""
+                          ? formatTabTimestamp(item.lastUpdated)
+                          : item.lastUpdate && item.lastUpdate.trim() !== ""
                           ? formatTabTimestamp(item.lastUpdate)
-                          : item.tabTimestamp || item.tabTimestampFormatted || item.createdAtFormatted
-                          ? formatTabTimestamp(item.tabTimestampFormatted || item.tabTimestamp || item.createdAtFormatted)
-                          : `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                          : item.tabTimestampFormatted && item.tabTimestampFormatted.trim() !== ""
+                          ? formatTabTimestamp(item.tabTimestampFormatted)
+                          : item.createdAtFormatted && item.createdAtFormatted.trim() !== ""
+                          ? formatTabTimestamp(item.createdAtFormatted)
+                          : formatToLocalTimestamp(new Date())}
                       </span>
                     </div>
 
