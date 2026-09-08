@@ -90,7 +90,34 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isGuestMatriculacionOpen, setIsGuestMatriculacionOpen] = useState(false);
   const [isGuestFeedbackOpen, setIsGuestFeedbackOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("apex_notifications");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed.filter(
+              (n: NotificationItem) => n.id !== "notif-1" && n.id !== "notif-2"
+            );
+          }
+        }
+      } catch {
+        // ignore storage read error
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("apex_notifications", JSON.stringify(notifications));
+      } catch {
+        // ignore storage write error
+      }
+    }
+  }, [notifications]);
   const [selectedAgentForDetail, setSelectedAgentForDetail] = useState<AgentRecord | null>(null);
   const [selectedAgentForCert, setSelectedAgentForCert] = useState<AgentRecord | null>(null);
   const [statusDetailModal, setStatusDetailModal] = useState<ApprovalStatus | "ALL" | null>(null);
@@ -857,6 +884,7 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenGuestMatriculacion={() => setIsGuestMatriculacionOpen(true)}
         onOpenGuestFeedback={() => setIsGuestFeedbackOpen(true)}
+        unreadNotificationsCount={notifications.filter((n) => !n.isRead).length}
         isAdmin={isAdmin}
         isLoading={isLoadingSheets}
         totalAgents={records.length}

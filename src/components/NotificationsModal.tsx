@@ -21,6 +21,7 @@ import {
   ExternalLink,
   User,
   ClipboardCheck,
+  Trash2,
 } from "lucide-react";
 
 export interface NotificationItem {
@@ -59,57 +60,7 @@ export interface NotificationItem {
   };
 }
 
-export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    type: "matriculacion",
-    title: "Nueva Solicitud de Matriculación",
-    shortDescription: "Agente U616446 pendiente de alta y vinculación en CD2633.",
-    timestamp: "Hace 15 minutos",
-    isRead: false,
-    informacionDetallada: {
-      categoria: "Matriculación y Usuarios",
-      origen: "Portal de Operaciones / Formulario de Alta",
-      agenteReferencia: "U616446 (Gómez, Facundo)",
-      cursoReferencia: "CD2633",
-      motivo: "Ingreso de nuevo colaborador al equipo de Cobranzas Especiales.",
-      resumenImpacto: "El colaborador requiere acceso habilitado en el campus para rendir la evaluación antes del viernes a las 18:00 hs.",
-      matriculacionData: {
-        nombreCompleto: "Juan Pérez",
-        legajoUsuario: "U616446",
-        nombreCursoTest: "CD2633",
-        adjunto: {
-          nombreArchivo: "evidencia_matriculacion.png",
-          tamano: "482 KB",
-        },
-      },
-      recomendacionAccion: "Verificar registro en la pestaña Lista_agentes y copiar plantilla de matriculación hacia soporte.",
-    },
-  },
-  {
-    id: "notif-2",
-    type: "feedback",
-    title: "Nuevo Feedback de Desempeño",
-    shortDescription: "Trainer ha cargado una nueva devolución de auditoría para revisión.",
-    timestamp: "Hace 5 minutos",
-    isRead: false,
-    informacionDetallada: {
-      categoria: "FEEDBACK",
-      origen: "Módulo de Auditoría y Coaching Pedagógico",
-      motivo: "Revisión mensual de calidad en atención y soporte.",
-      resumenImpacto: "El colaborador requiere feedback firmado para habilitar su paso a operaciones avanzadas.",
-      feedbackData: {
-        evaluadorTrainer: "Lucía Romero (Trainer Senior)",
-        fechaDevolucion: "21/08/2026 - 11:20 hs",
-        notaDesempeno: "92 / 100 (Sobresaliente)",
-        colaborador: "Gómez, Facundo (U616446)",
-        areaServicio: "Soporte Nivel 2 • Cobranzas",
-        observacionesClave: "Excelente manejo de objeciones y dicción clara. Optimizar tiempo de tipificación en CRM.",
-      },
-      recomendacionAccion: "Revisar los puntos clave observados y coordinar sesión de coaching uno a uno.",
-    },
-  },
-];
+export const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -125,9 +76,9 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   setNotifications: externalSetNotifications,
 }) => {
   const [internalNotifications, setInternalNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const notifications = externalNotifications || internalNotifications;
+  const notifications = externalNotifications !== undefined ? externalNotifications : internalNotifications;
   const setNotifications = externalSetNotifications || setInternalNotifications;
-  const [activeNotificationId, setActiveNotificationId] = useState<string | null>("notif-1");
+  const [activeNotificationId, setActiveNotificationId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -152,6 +103,15 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
   const handleMarkAllAsRead = () => {
     setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+  };
+
+  // Función para Eliminar / Completar Notificación
+  const handleDeleteNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((item) => item.id !== id));
+    if (activeNotificationId === id) {
+      setActiveNotificationId(null);
+    }
+    showToast("Notificación eliminada de la bandeja");
   };
 
   // Acción: Matricular (Copia al portapapeles y abre Gmail con Asunto)
@@ -323,78 +283,94 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
           >
             <div className="px-2 py-1 flex items-center justify-between text-[11px] font-semibold text-[#8C9487] uppercase tracking-wider">
               <span>Recientes ({notifications.length})</span>
-              <span className="sm:hidden text-emerald-700 cursor-pointer" onClick={handleMarkAllAsRead}>
-                Leídas
-              </span>
+              {unreadCount > 0 && (
+                <span className="sm:hidden text-emerald-700 cursor-pointer" onClick={handleMarkAllAsRead}>
+                  Leídas
+                </span>
+              )}
             </div>
 
-            {notifications.map((item) => {
-              const badge = getNotificationBadge(item.type);
-              const isSelected = activeNotificationId === item.id;
-
-              return (
-                <div
-                  key={item.id}
-                  id={`notification-card-${item.id}`}
-                  onClick={() => handleSelectNotification(item.id)}
-                  className={`group relative p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
-                    isSelected
-                      ? "bg-white border-[#4F7A4F] shadow-sm ring-1 ring-[#4F7A4F]/20"
-                      : item.isRead
-                      ? "bg-white/70 hover:bg-white border-[#E5EAE0] text-[#6B7366]"
-                      : "bg-white hover:bg-white border-[#C5DAC5] shadow-2xs text-[#1E241B]"
-                  }`}
-                >
-                  {/* Punto Azul de No Leída */}
-                  {!item.isRead && (
-                    <span className="absolute top-3.5 right-3.5 h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" />
-                  )}
-
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg shrink-0 ${badge.bg}`}>
-                      {badge.icon}
-                    </div>
-
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                          item.type === "feedback" ? "text-blue-600" : "text-[#4F7A4F]"
-                        }`}>
-                          {badge.label}
-                        </span>
-                        <span className="text-[10px] text-[#8C9487]"> • {item.timestamp}</span>
-                      </div>
-                      <h3
-                        className={`font-sans font-extrabold text-sm tracking-tight truncate mt-0.5 ${
-                          !item.isRead ? "text-slate-800" : "text-slate-600"
-                        }`}
-                      >
-                        {item.type === "matriculacion" ? (
-                          <>
-                            Nueva Solicitud de <span className="text-[#0083a4]">Matriculación</span>
-                          </>
-                        ) : item.type === "feedback" ? (
-                          <>
-                            Nuevo Feedback de <span className="text-[#0083a4]">Desempeño</span>
-                          </>
-                        ) : (
-                          item.title
-                        )}
-                      </h3>
-                      <p className="text-[11px] text-[#6B7366] line-clamp-2 mt-1 leading-relaxed">
-                        {item.shortDescription}
-                      </p>
-                    </div>
-
-                    <ChevronRight
-                      className={`h-4 w-4 shrink-0 transition-transform ${
-                        isSelected ? "text-[#4F7A4F] translate-x-0.5" : "text-[#A8B0A2]"
-                      }`}
-                    />
-                  </div>
+            {notifications.length === 0 ? (
+              <div className="py-20 px-4 flex flex-col items-center justify-center text-center text-[#6B7366] space-y-2.5">
+                <div className="w-10 h-10 rounded-full bg-[#F1F3EE] flex items-center justify-center text-[#8C9487]">
+                  <Inbox className="h-5 w-5" />
                 </div>
-              );
-            })}
+                <p className="text-xs text-[#8C9487] font-medium">
+                  No tienes notificaciones pendientes
+                </p>
+              </div>
+            ) : (
+              notifications.map((item) => {
+                const badge = getNotificationBadge(item.type);
+                const isSelected = activeNotificationId === item.id;
+
+                return (
+                  <div
+                    key={item.id}
+                    id={`notification-card-${item.id}`}
+                    onClick={() => handleSelectNotification(item.id)}
+                    className={`group relative p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-white border-[#4F7A4F] shadow-sm ring-1 ring-[#4F7A4F]/20"
+                        : item.isRead
+                        ? "bg-white/70 hover:bg-white border-[#E5EAE0] text-[#6B7366]"
+                        : "bg-white hover:bg-white border-[#C5DAC5] shadow-2xs text-[#1E241B]"
+                    }`}
+                  >
+                    {/* Punto Azul de No Leída */}
+                    {!item.isRead && (
+                      <span className="absolute top-3.5 right-3.5 h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" />
+                    )}
+
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg shrink-0 ${badge.bg}`}>
+                        {badge.icon}
+                      </div>
+
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                            item.type === "feedback" ? "text-blue-600" : "text-[#4F7A4F]"
+                          }`}>
+                            {badge.label}
+                          </span>
+                          <span className="text-[10px] text-[#8C9487]"> • {item.timestamp}</span>
+                        </div>
+                        <h3
+                          className={`font-sans font-extrabold text-sm tracking-tight truncate mt-0.5 ${
+                            !item.isRead ? "text-slate-800" : "text-slate-600"
+                          }`}
+                        >
+                          {item.title}
+                        </h3>
+                        <p className="text-[11px] text-[#6B7366] line-clamp-2 mt-1 leading-relaxed">
+                          {item.shortDescription}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-between gap-2 shrink-0 self-stretch">
+                        <button
+                          id={`btn-delete-item-${item.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteNotification(item.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                          title="Eliminar notificación"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                        <ChevronRight
+                          className={`h-4 w-4 transition-transform ${
+                            isSelected ? "text-[#4F7A4F] translate-x-0.5" : "text-[#A8B0A2]"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Columna Derecha: Detalle de Información Complementaria (7 columnas en desktop) */}
@@ -510,13 +486,37 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                   <div className="space-y-4 pt-1">
                     <div>
                       <p className="text-sm font-bold text-[#1E241B]">Remitente / Quien Envió:</p>
-                      <p className="text-sm text-slate-600 mb-4">Lucía Romero (Trainer Senior)</p>
+                      <p className="text-sm text-slate-600 mb-3">
+                        {activeNotification.informacionDetallada.feedbackData?.evaluadorTrainer ||
+                          activeNotification.informacionDetallada.origen ||
+                          "Evaluador"}
+                      </p>
                     </div>
 
+                    {activeNotification.informacionDetallada.feedbackData?.colaborador && (
+                      <div>
+                        <p className="text-sm font-bold text-[#1E241B]">Colaborador / Agente:</p>
+                        <p className="text-sm text-slate-600 mb-3">
+                          {activeNotification.informacionDetallada.feedbackData.colaborador}
+                        </p>
+                      </div>
+                    )}
+
+                    {activeNotification.informacionDetallada.feedbackData?.notaDesempeno && (
+                      <div>
+                        <p className="text-sm font-bold text-[#1E241B]">Calificación / Desempeño:</p>
+                        <p className="text-sm font-bold text-emerald-700 mb-3">
+                          {activeNotification.informacionDetallada.feedbackData.notaDesempeno}
+                        </p>
+                      </div>
+                    )}
+
                     <div>
-                      <p className="text-sm font-bold text-[#1E241B]">Comentario Realizado:</p>
-                      <p className="text-sm text-slate-600 mb-4">
-                        "Excelente manejo de objeciones y dicción clara. Optimizar tiempo de tipificación."
+                      <p className="text-sm font-bold text-[#1E241B]">Comentario / Devolución Realizada:</p>
+                      <p className="text-sm text-slate-600 mb-4 whitespace-pre-wrap leading-relaxed">
+                        {activeNotification.informacionDetallada.feedbackData?.observacionesClave ||
+                          activeNotification.informacionDetallada.motivo ||
+                          activeNotification.shortDescription}
                       </p>
                     </div>
 
@@ -591,18 +591,22 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                   <Inbox className="h-6 w-6" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-[#2D332A]">Selecciona una notificación</h4>
+                  <h4 className="text-sm font-bold text-[#2D332A]">
+                    {notifications.length === 0 ? "No tienes notificaciones pendientes" : "Selecciona una notificación"}
+                  </h4>
                   <p className="text-xs text-[#6B7366] max-w-xs mt-1">
-                    Haz clic sobre cualquier alerta de la columna izquierda para desplegar su información detallada.
+                    {notifications.length === 0
+                      ? "Tu bandeja está al día. Las solicitudes reales de matriculación y feedbacks de auditoría aparecerán aquí."
+                      : "Haz clic sobre cualquier alerta de la columna izquierda para desplegar su información detallada."}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Pie de detalle con BOTÓN AUTOMATIZADO "MATRICULAR" (CONEXIÓN CON GMAIL) */}
+            {/* Pie de detalle con BOTÓN AUTOMATIZADO "MATRICULAR" Y BOTÓN "ELIMINAR PEDIDO" */}
             {activeNotification && (
               <div className="pt-4 border-t border-[#E1E6DC] flex items-center justify-between gap-3 text-xs text-[#6B7366] flex-wrap">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 text-slate-500">
                   <CheckCircle2 className="h-3.5 w-3.5 text-[#4F7A4F]" /> Notificación verificada
                 </span>
 
@@ -620,7 +624,19 @@ Agradezco de antemano tu gestión y apoyo con este requerimiento para poder avan
                     </button>
                   )}
 
+                  {/* Botón Visible para Eliminar / Completar Tarea */}
                   <button
+                    id={`btn-delete-notification-${activeNotification.id}`}
+                    onClick={() => handleDeleteNotification(activeNotification.id)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    title="Descartar o eliminar esta notificación una vez completada la tarea"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    <span>Eliminar Pedido</span>
+                  </button>
+
+                  <button
+                    id="btn-close-detail"
                     onClick={() => setActiveNotificationId(null)}
                     className="hidden md:inline text-xs font-semibold text-[#4F7A4F] hover:underline cursor-pointer px-2 py-1"
                   >

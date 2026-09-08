@@ -24,6 +24,7 @@ interface NavbarProps {
   onOpenNotifications?: () => void;
   onOpenGuestMatriculacion?: () => void;
   onOpenGuestFeedback?: () => void;
+  unreadNotificationsCount?: number;
   isAdmin: boolean;
   isLoading: boolean;
   totalAgents: number;
@@ -42,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications,
   onOpenGuestMatriculacion,
   onOpenGuestFeedback,
+  unreadNotificationsCount = 0,
   isAdmin,
   isLoading,
   totalAgents,
@@ -154,15 +156,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* BOTONES EXCLUSIVOS DE ADMINISTRADOR: Visibles ÚNICAMENTE si isAdmin === true */}
             {isAdmin && (
               <>
-                {/* Botón de Notificaciones */}
+                {/* Botón de Notificaciones con Contador Dinámico */}
                 <button
                   id="btn-navbar-notificaciones"
                   onClick={onOpenNotifications}
-                  className="rounded-full bg-[#0083a4] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#006b85] transition-colors border-none shadow-sm cursor-pointer active:scale-95 shrink-0"
-                  title="Notificaciones"
+                  className="relative rounded-full bg-[#0083a4] text-white font-sans font-bold text-sm px-6 py-2.5 flex items-center gap-2 hover:bg-[#006b85] transition-colors border-none shadow-sm cursor-pointer active:scale-95 shrink-0"
+                  title="Bandeja de Notificaciones"
                 >
                   <span className="text-base leading-none">🔔</span>
                   <span>Notificaciones</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="ml-0.5 px-2 py-0.5 text-[11px] font-extrabold bg-red-500 text-white rounded-full shadow-xs animate-pulse">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
                 </button>
 
                 {/* Informe IA */}
