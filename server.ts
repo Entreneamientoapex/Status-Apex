@@ -62,33 +62,50 @@ async function startServer() {
         // Continue to revision extraction
       }
 
-      // 2. Query Google Sheets export revision metadata (returns exact file modification timestamp)
-      try {
-        const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&range=A1:A1&_t=${Date.now()}`;
-        const headRes = await fetch(exportUrl, { redirect: "manual" });
-        const loc = headRes.headers.get("location");
-        if (loc) {
-          const match = loc.match(/\/(\d{13})\//);
-          if (match) {
-            const ms = parseInt(match[1], 10);
-            return res.json({
-              fileId,
-              modifiedTime: new Date(ms).toISOString(),
-              source: "sheets_revision",
-            });
-          }
-        }
-      } catch {
-        // Fallback
-      }
-
       return res.json({
         fileId,
-        modifiedTime: new Date().toISOString(),
+        modifiedTime: null,
         source: "fallback",
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || "Error fetching Drive metadata" });
+    }
+  });
+
+  // Endpoint de Metadatos de Hoja / Drive para el centinela por curso (/api/sheet-metadata?id=...)
+  app.get("/api/sheet-metadata", async (req: Request, res: Response) => {
+    try {
+      const cursoId = String(req.query.id || req.query.cursoId || "").trim();
+      const COURSE_FILE_IDS: Record<string, string> = {
+        "CD2641": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+        "CD2633": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+        "DEFAULT": "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg",
+      };
+
+      const fileId =
+        COURSE_FILE_IDS[cursoId.toUpperCase()] ||
+        (cursoId.startsWith("1") && cursoId.length > 20 ? cursoId : "1fseOST7N6hEgdBA2PGkSekoCuang7ERhI-HLs4u-hbg");
+
+      // 1. Consultar endpoint oficial de Google Drive API v3
+      try {
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,modifiedTime`;
+        const driveRes = await fetch(driveUrl);
+        if (driveRes.ok) {
+          const data = await driveRes.json();
+          if (data && data.modifiedTime) {
+            return res.json({ id: cursoId, fileId, modifiedTime: data.modifiedTime, source: "drive_v3" });
+          }
+        }
+      } catch {}
+
+      return res.json({
+        id: cursoId,
+        fileId,
+        modifiedTime: null,
+        source: "fallback",
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Error fetching sheet metadata" });
     }
   });
 

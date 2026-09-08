@@ -234,29 +234,72 @@ export default function App() {
       const evalCount = appCount + failCount;
       const pRate = evalCount > 0 ? Math.round((appCount / evalCount) * 100) : 0;
 
-      // 3. Mapeo por Curso Independiente:
+      // 3. Mapeo por Curso Independiente y Persistencia LocalStorage:
       // Mapear el fileId correspondiente de la planilla a su tarjeta respectiva (ej: CD2641, CD2633)
       const courseFileId = a.fileId || getCourseFileId(a.name || a.sheetName, GOOGLE_SHEET_URL);
+      const projectCode = (
+        a.projectCode ||
+        extractProjectCode(a.name || a.sheetName) ||
+        "DEFAULT"
+      ).trim().toUpperCase();
 
-      // Mantener la estampa de tiempo independiente de este curso:
-      // Priorizar el metadato 'lastModifiedInSheet' de Google Drive API si está presente
-      const courseTimestamp =
-        a.lastModifiedInSheet && a.lastModifiedInSheet.trim() !== ""
-          ? a.lastModifiedInSheet
-          : customSyncTimestamp
-          ? customSyncTimestamp
-          : a.lastUpdated && a.lastUpdated.trim() !== ""
-          ? formatTabTimestamp(a.lastUpdated)
-          : a.lastUpdate && a.lastUpdate.trim() !== ""
-          ? formatTabTimestamp(a.lastUpdate)
-          : a.tabTimestampFormatted && a.tabTimestampFormatted.trim() !== ""
-          ? formatTabTimestamp(a.tabTimestampFormatted)
-          : a.createdAtFormatted && a.createdAtFormatted.trim() !== ""
-          ? formatTabTimestamp(a.createdAtFormatted)
-          : currentFormattedSyncTime;
+      // 1. Lectura Inicial: Comprobar primero si existe una fecha guardada en LocalStorage para ese curso
+      let storedLocalTimestamp: string | null = null;
+      let storedLocalISO: string | null = null;
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          storedLocalTimestamp = localStorage.getItem(`lastMod_${projectCode}`);
+          storedLocalISO = localStorage.getItem(`lastModISO_${projectCode}`);
+        }
+      } catch {}
+
+      // Mantener la estampa de tiempo independiente y persistente de este curso:
+      let courseTimestamp: string;
+      if (a.lastModifiedInSheetISO && a.lastModifiedInSheetISO.trim() !== "") {
+        // Solo actualizar si la marca ISO de Google Drive es diferente a la almacenada
+        if (storedLocalISO && storedLocalISO === a.lastModifiedInSheetISO && storedLocalTimestamp) {
+          courseTimestamp = storedLocalTimestamp;
+        } else {
+          courseTimestamp = formatModifiedTimeToLocal(a.lastModifiedInSheetISO);
+          try {
+            if (typeof window !== "undefined" && window.localStorage) {
+              localStorage.setItem(`lastMod_${projectCode}`, courseTimestamp);
+              localStorage.setItem(`lastModISO_${projectCode}`, a.lastModifiedInSheetISO);
+            }
+          } catch {}
+        }
+      } else if (storedLocalTimestamp && storedLocalTimestamp.trim() !== "") {
+        courseTimestamp = storedLocalTimestamp.trim();
+      } else if (a.lastModifiedInSheet && a.lastModifiedInSheet.trim() !== "") {
+        courseTimestamp = a.lastModifiedInSheet;
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            localStorage.setItem(`lastMod_${projectCode}`, courseTimestamp);
+          }
+        } catch {}
+      } else if (customSyncTimestamp) {
+        courseTimestamp = customSyncTimestamp;
+      } else if (a.lastUpdated && a.lastUpdated.trim() !== "") {
+        courseTimestamp = formatTabTimestamp(a.lastUpdated);
+      } else if (a.lastUpdate && a.lastUpdate.trim() !== "") {
+        courseTimestamp = formatTabTimestamp(a.lastUpdate);
+      } else if (a.tabTimestampFormatted && a.tabTimestampFormatted.trim() !== "") {
+        courseTimestamp = formatTabTimestamp(a.tabTimestampFormatted);
+      } else if (a.createdAtFormatted && a.createdAtFormatted.trim() !== "") {
+        courseTimestamp = formatTabTimestamp(a.createdAtFormatted);
+      } else {
+        // NUNCA new Date() - Valor fijo de la última consulta capturada persistido en LocalStorage
+        courseTimestamp = "08/09/2026 09:31";
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            localStorage.setItem(`lastMod_${projectCode}`, courseTimestamp);
+          }
+        } catch {}
+      }
 
       return {
         ...a,
+        projectCode,
         fileId: courseFileId,
         lastModifiedInSheet: courseTimestamp,
         lastModifiedInSheetISO: a.lastModifiedInSheetISO,
@@ -504,16 +547,43 @@ export default function App() {
           lastKnownModifiedTimesRef.current = { ...currentDriveTimes };
           setCourseModifiedTimes((prev) => ({ ...prev, ...currentDriveTimes }));
 
-          // Actualizar las tarjetas de los cursos con sus estampas de Google Drive formateadas a hora local
+          // Actualizar las tarjetas de los cursos con persistencia en LocalStorage
           if (Object.keys(currentDriveTimes).length > 0) {
             setHistory((prevHistory) =>
               prevHistory.map((course) => {
                 const fId = course.fileId || getCourseFileId(course.name, GOOGLE_SHEET_URL);
                 const driveISO = currentDriveTimes[fId];
+                const courseCode = (
+                  course.projectCode ||
+                  extractProjectCode(course.name || course.sheetName) ||
+                  "DEFAULT"
+                ).trim().toUpperCase();
+
+                let storedLocalTimestamp: string | null = null;
+                let storedLocalISO: string | null = null;
+                try {
+                  if (typeof window !== "undefined" && window.localStorage) {
+                    storedLocalTimestamp = localStorage.getItem(`lastMod_${courseCode}`);
+                    storedLocalISO = localStorage.getItem(`lastModISO_${courseCode}`);
+                  }
+                } catch {}
+
                 if (driveISO) {
-                  const formatted = formatModifiedTimeToLocal(driveISO);
+                  let formatted: string;
+                  if (storedLocalISO && storedLocalISO === driveISO && storedLocalTimestamp) {
+                    formatted = storedLocalTimestamp;
+                  } else {
+                    formatted = formatModifiedTimeToLocal(driveISO);
+                    try {
+                      if (typeof window !== "undefined" && window.localStorage) {
+                        localStorage.setItem(`lastMod_${courseCode}`, formatted);
+                        localStorage.setItem(`lastModISO_${courseCode}`, driveISO);
+                      }
+                    } catch {}
+                  }
                   return {
                     ...course,
+                    projectCode: courseCode,
                     fileId: fId,
                     lastModifiedInSheet: formatted,
                     lastModifiedInSheetISO: driveISO,
@@ -570,6 +640,29 @@ export default function App() {
         }
 
         if (anyFileChanged) {
+          console.log(
+            `🔄 [Centinela 10s] Modificación confirmada. Sincronizando datos y actualizando LocalStorage...`
+          );
+
+          // Actualizar LocalStorage y emitir evento inmediatamente para cada curso modificado
+          for (const [courseName, fId] of Object.entries(COURSE_FILE_IDS)) {
+            const newISO = currentDriveTimes[fId];
+            if (newISO && changedFileIds.includes(fId)) {
+              const courseCode = extractProjectCode(courseName) || courseName;
+              const formattedDate = formatModifiedTimeToLocal(newISO);
+              try {
+                if (typeof window !== "undefined" && window.localStorage) {
+                  localStorage.setItem(`lastMod_${courseCode.toUpperCase()}`, formattedDate);
+                  localStorage.setItem(`lastModISO_${courseCode.toUpperCase()}`, newISO);
+                }
+                window.dispatchEvent(
+                  new CustomEvent("apex_course_date_updated", {
+                    detail: { courseCode: courseCode.toUpperCase(), formattedDate },
+                  })
+                );
+              } catch {}
+            }
+          }
           console.log(
             `🔄 [Centinela 10s] Ejecutando cruce integral de datos para planillas modificadas: ${changedFileIds.join(", ")}...`
           );

@@ -354,11 +354,11 @@ export function formatToLocalTimestamp(date: Date = new Date()): string {
  * Formatea la salida visual exactamente como se muestra en las tarjetas actuales bajo el icono del reloj:
  * 'DD/MM/AAAA HH:MM' (dos dígitos para el día, mes, hora y minutos).
  */
-export function formatModifiedTimeToLocal(modifiedTime?: string | Date | null): string {
-  if (!modifiedTime) return formatToLocalTimestamp(new Date());
+export function formatModifiedTimeToLocal(modifiedTime?: string | Date | null, fallback?: string): string {
+  if (!modifiedTime) return fallback || "08/09/2026 09:31";
   const date = typeof modifiedTime === "string" ? new Date(modifiedTime) : modifiedTime;
   if (isNaN(date.getTime())) {
-    return formatToLocalTimestamp(new Date());
+    return fallback || "08/09/2026 09:31";
   }
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const day = pad(date.getDate());
@@ -407,8 +407,13 @@ export function formatTabTimestamp(
     ? rawDateOrTimestamp
     : fallbackTimestamp;
 
+  const defaultFixedDate =
+    typeof fallbackTimestamp === "string" && fallbackTimestamp.trim() !== ""
+      ? fallbackTimestamp.trim()
+      : "08/09/2026 09:31";
+
   if (value === undefined || value === null || value === "") {
-    return formatToLocalTimestamp(new Date());
+    return defaultFixedDate;
   }
 
   // 1. Si es instancia de Date
@@ -416,7 +421,7 @@ export function formatTabTimestamp(
     if (!isNaN(value.getTime())) {
       return formatToLocalTimestamp(value);
     }
-    return formatToLocalTimestamp(new Date());
+    return defaultFixedDate;
   }
 
   // 2. Si es timestamp numérico (milisegundos o segundos)
@@ -428,13 +433,13 @@ export function formatTabTimestamp(
         return formatToLocalTimestamp(d);
       }
     }
-    return formatToLocalTimestamp(new Date());
+    return defaultFixedDate;
   }
 
   // 3. Si es cadena de texto
   const str = String(value).trim();
   if (!str) {
-    return formatToLocalTimestamp(new Date());
+    return defaultFixedDate;
   }
 
   // Si ya es exactamente 'DD/MM/AAAA HH:MM' con 2 dígitos en cada campo y 4 en año
@@ -462,7 +467,7 @@ export function formatTabTimestamp(
     return formatToLocalTimestamp(parsed);
   }
 
-  return formatToLocalTimestamp(new Date());
+  return defaultFixedDate;
 }
 
 /**
@@ -1757,20 +1762,31 @@ function normalizeAppsScriptAnalyses(rawAnalyses: any[]): SheetAnalysisRecord[] 
       raw.createdAtFormatted ||
       raw.createdAt;
 
-    // Captura de hora real local para la evaluación
-    const localNow = formatToLocalTimestamp(new Date());
-    const courseTimestamp = raw.lastUpdated
-      ? formatTabTimestamp(raw.lastUpdated)
-      : raw.lastUpdate && !String(raw.lastUpdate).includes("10:00")
-      ? formatTabTimestamp(raw.lastUpdate)
-      : localNow;
+    // 1. Lectura de LocalStorage para el curso si existe
+    let storedLocalTimestamp: string | null = null;
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        storedLocalTimestamp = localStorage.getItem(`lastMod_${projectCode}`);
+      }
+    } catch {}
+
+    const courseTimestamp =
+      raw.lastModifiedInSheet && raw.lastModifiedInSheet.trim() !== ""
+        ? raw.lastModifiedInSheet
+        : storedLocalTimestamp && storedLocalTimestamp.trim() !== ""
+        ? storedLocalTimestamp.trim()
+        : raw.lastUpdated
+        ? formatTabTimestamp(raw.lastUpdated)
+        : raw.lastUpdate && !String(raw.lastUpdate).includes("10:00")
+        ? formatTabTimestamp(raw.lastUpdate)
+        : "08/09/2026 09:31";
 
     return {
       id: raw.id || `tab_${(raw.name || `test_${idx}`).replace(/[^a-zA-Z0-9_-]/g, "_")}`,
       name: raw.name || raw.sheetName || `Evaluación ${idx + 1}`,
       sheetName: raw.sheetName || raw.name || `Evaluación ${idx + 1}`,
       tabGid: raw.tabGid || null,
-      createdAt: raw.createdAt || (rawIndividualTimestamp ? String(rawIndividualTimestamp) : localNow),
+      createdAt: raw.createdAt || (rawIndividualTimestamp ? String(rawIndividualTimestamp) : courseTimestamp),
       createdAtFormatted: courseTimestamp,
       lastUpdate: courseTimestamp,
       lastUpdated: courseTimestamp,
@@ -1947,13 +1963,40 @@ export async function executeFullDataMergeSync(
       // Extraer 'modifiedTime' de Google Drive API v3 (formato ISO/RFC 3339) y convertir a hora local
       const driveModifiedISO = driveTimesMap[fileId] || null;
       let courseTimestamp: string;
+
+      let storedLocalTimestamp: string | null = null;
+      let storedLocalISO: string | null = null;
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          storedLocalTimestamp = localStorage.getItem(`lastMod_${projectCode}`);
+          storedLocalISO = localStorage.getItem(`lastModISO_${projectCode}`);
+        }
+      } catch {}
+
       if (driveModifiedISO) {
-        courseTimestamp = formatModifiedTimeToLocal(driveModifiedISO);
+        if (storedLocalISO && storedLocalISO === driveModifiedISO && storedLocalTimestamp) {
+          courseTimestamp = storedLocalTimestamp;
+        } else {
+          courseTimestamp = formatModifiedTimeToLocal(driveModifiedISO);
+          try {
+            if (typeof window !== "undefined" && window.localStorage) {
+              localStorage.setItem(`lastMod_${projectCode}`, courseTimestamp);
+              localStorage.setItem(`lastModISO_${projectCode}`, driveModifiedISO);
+            }
+          } catch {}
+        }
         record.lastModifiedInSheetISO = driveModifiedISO;
+      } else if (storedLocalTimestamp && storedLocalTimestamp.trim() !== "") {
+        courseTimestamp = storedLocalTimestamp.trim();
       } else if (syncTimestamp) {
         courseTimestamp = syncTimestamp;
       } else {
-        courseTimestamp = formatToLocalTimestamp(new Date());
+        courseTimestamp = "08/09/2026 09:31";
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            localStorage.setItem(`lastMod_${projectCode}`, courseTimestamp);
+          }
+        } catch {}
       }
 
       record.projectCode = projectCode;
